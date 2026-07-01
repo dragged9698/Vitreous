@@ -1,16 +1,16 @@
 import 'dart:async';
-import 'package:plezy/media/ids.dart';
+import 'package:emby_player/media/ids.dart';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/media/media_library.dart';
-import 'package:plezy/media/media_server_client.dart';
-import 'package:plezy/providers/libraries_provider.dart';
-import 'package:plezy/providers/multi_server_provider.dart';
-import 'package:plezy/services/data_aggregation_service.dart';
-import 'package:plezy/services/multi_server_manager.dart';
-import 'package:plezy/services/storage_service.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/media/media_library.dart';
+import 'package:emby_player/media/media_server_client.dart';
+import 'package:emby_player/providers/libraries_provider.dart';
+import 'package:emby_player/providers/multi_server_provider.dart';
+import 'package:emby_player/services/data_aggregation_service.dart';
+import 'package:emby_player/services/multi_server_manager.dart';
+import 'package:emby_player/services/storage_service.dart';
 
 import '../test_helpers/prefs.dart';
 

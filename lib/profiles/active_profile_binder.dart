@@ -318,6 +318,8 @@ class ActiveProfileBinder {
       switch (byId[pc.connectionId]) {
         case PlexAccountConnection(:final servers):
           expected.addAll(servers.map((server) => server.clientIdentifier));
+        case EmbyConnection(:final serverMachineId):
+          expected.add(serverMachineId);
         case JellyfinConnection(:final serverMachineId):
           expected.add(serverMachineId);
         case null:
@@ -480,6 +482,9 @@ class ActiveProfileBinder {
         case PlexAccountConnection():
           expected.addAll(conn.servers.map((server) => server.clientIdentifier));
           futures.add(_bindLocalPlexConnection(profile: profile, conn: conn, pc: pc));
+        case EmbyConnection():
+          expected.add(conn.serverMachineId);
+          futures.add(_bindEmby(conn));
         case JellyfinConnection():
           expected.add(conn.serverMachineId);
           futures.add(_bindJellyfin(conn));
@@ -851,16 +856,28 @@ class ActiveProfileBinder {
     );
   }
 
+  Future<_ProfileBindResult> _bindEmby(EmbyConnection conn) async {
+    final ok = await serverManager.addEmbyConnection(conn);
+    final machineId = conn.serverMachineId;
+    final registered = serverManager.serverIds.contains(machineId);
+    if (ok || serverManager.authErrorServerIds.contains(machineId) || registered) {
+      return _ProfileBindResult.visible({machineId});
+    }
+    return _ProfileBindResult(visibleServerIds: const {}, expectedServerIds: {machineId});
+  }
+
   Future<_ProfileBindResult> _bindJellyfin(JellyfinConnection conn) async {
     final ok = await serverManager.addJellyfinConnection(conn);
+    final machineId = conn.serverMachineId;
     // `addJellyfinConnection` registers the client even when the health probe
     // returns authError. Keep that server in the active profile's visibility
     // filter so the re-auth banner can surface it instead of hiding it as if
     // the profile had no server.
-    if (ok || serverManager.authErrorServerIds.contains(conn.serverMachineId)) {
-      return _ProfileBindResult.visible({conn.serverMachineId});
+    final registered = serverManager.serverIds.contains(machineId);
+    if (ok || serverManager.authErrorServerIds.contains(machineId) || registered) {
+      return _ProfileBindResult.visible({machineId});
     }
-    return _ProfileBindResult(visibleServerIds: const {}, expectedServerIds: {conn.serverMachineId});
+    return _ProfileBindResult(visibleServerIds: const {}, expectedServerIds: {machineId});
   }
 
   Future<PlexAuthService> _ensureAuth() async {

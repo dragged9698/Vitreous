@@ -3,15 +3,15 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:plezy/connection/connection.dart';
-import 'package:plezy/media/library_query.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_item.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/media/media_server_client.dart';
-import 'package:plezy/models/transcode_quality_preset.dart';
-import 'package:plezy/services/jellyfin_client.dart';
-import 'package:plezy/services/playback_initialization_types.dart';
+import 'package:emby_player/connection/connection.dart';
+import 'package:emby_player/media/library_query.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_item.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/media/media_server_client.dart';
+import 'package:emby_player/models/transcode_quality_preset.dart';
+import 'package:emby_player/services/jellyfin_client.dart';
+import 'package:emby_player/services/playback_initialization_types.dart';
 
 JellyfinConnection _conn({String accessToken = 'tok-abc', String baseUrl = 'https://jf.example.com'}) =>
     JellyfinConnection(
@@ -1592,12 +1592,14 @@ void main() {
       );
       addTearDown(scoped.close);
 
-      final result = await scoped.fetchLibraryFiltersWithValues('lib-1');
+      final result = await scoped.fetchLibraryFiltersWithValues('lib-1', libraryKind: MediaKind.mixed);
 
       expect(captured, isNotNull);
       expect(captured!.path, '/Items/Filters');
       expect(captured!.queryParameters['ParentId'], 'lib-1');
       expect(captured!.queryParameters['userId'], 'user-1');
+      expect(captured!.queryParameters['Recursive'], 'true');
+      expect(captured!.queryParameters['IncludeItemTypes'], 'Movie,Series');
       expect(result.filters.map((filter) => filter.filter), ['unwatched', 'genre', 'year', 'contentRating', 'tag']);
       expect(result.filters.first.filterType, 'boolean');
       expect(result.filters.first.key, 'jellyfin:unwatched');

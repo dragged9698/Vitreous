@@ -28,6 +28,13 @@ mixin _JellyfinWatchStateMethods on MediaServerCacheMixin {
   }
 
   @override
+  Future<void> setFavorite(MediaItem item, bool isFavorite) async {
+    final path = '/Users/${_segment(connection.userId)}/FavoriteItems/${_segment(item.id)}';
+    final response = isFavorite ? await _http.post(path) : await _http.delete(path);
+    throwIfHttpError(response);
+  }
+
+  @override
   Future<void> rate(MediaItem item, double rating) async {
     // Lossy mapping — Jellyfin only stores a binary like/dislike. Treat
     // a negative input as "clear the rating" (DELETE), >= 6/10 as a like

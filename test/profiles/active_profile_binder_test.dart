@@ -1,29 +1,29 @@
 import 'dart:async';
-import 'package:plezy/media/ids.dart';
+import 'package:emby_player/media/ids.dart';
 import 'dart:convert';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:plezy/connection/connection.dart';
-import 'package:plezy/connection/connection_registry.dart';
-import 'package:plezy/database/app_database.dart';
-import 'package:plezy/models/plex/plex_home_user.dart';
-import 'package:plezy/profiles/active_profile_binder.dart';
-import 'package:plezy/profiles/active_profile_provider.dart';
-import 'package:plezy/profiles/plex_home_service.dart';
-import 'package:plezy/profiles/profile.dart';
-import 'package:plezy/profiles/profile_connection.dart';
-import 'package:plezy/profiles/profile_connection_registry.dart';
-import 'package:plezy/profiles/profile_registry.dart';
-import 'package:plezy/providers/multi_server_provider.dart';
-import 'package:plezy/services/data_aggregation_service.dart';
-import 'package:plezy/services/multi_server_manager.dart';
-import 'package:plezy/services/plex_auth_service.dart';
-import 'package:plezy/services/storage_service.dart';
-import 'package:plezy/utils/media_server_http_client.dart';
-import 'package:plezy/utils/media_server_timeouts.dart';
+import 'package:emby_player/connection/connection.dart';
+import 'package:emby_player/connection/connection_registry.dart';
+import 'package:emby_player/database/app_database.dart';
+import 'package:emby_player/models/plex/plex_home_user.dart';
+import 'package:emby_player/profiles/active_profile_binder.dart';
+import 'package:emby_player/profiles/active_profile_provider.dart';
+import 'package:emby_player/profiles/plex_home_service.dart';
+import 'package:emby_player/profiles/profile.dart';
+import 'package:emby_player/profiles/profile_connection.dart';
+import 'package:emby_player/profiles/profile_connection_registry.dart';
+import 'package:emby_player/profiles/profile_registry.dart';
+import 'package:emby_player/providers/multi_server_provider.dart';
+import 'package:emby_player/services/data_aggregation_service.dart';
+import 'package:emby_player/services/multi_server_manager.dart';
+import 'package:emby_player/services/plex_auth_service.dart';
+import 'package:emby_player/services/storage_service.dart';
+import 'package:emby_player/utils/media_server_http_client.dart';
+import 'package:emby_player/utils/media_server_timeouts.dart';
 
 import '../test_helpers/prefs.dart';
 

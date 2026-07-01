@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/mpv/models.dart';
-import 'package:plezy/mpv/player/player.dart';
-import 'package:plezy/mpv/player/player_state.dart';
-import 'package:plezy/mpv/player/player_streams.dart';
-import 'package:plezy/services/settings_service.dart';
-import 'package:plezy/theme/mono_tokens.dart';
-import 'package:plezy/utils/platform_detector.dart';
-import 'package:plezy/widgets/video_controls/sheets/video_settings_sheet.dart';
+import 'package:emby_player/mpv/models.dart';
+import 'package:emby_player/mpv/player/player.dart';
+import 'package:emby_player/mpv/player/player_state.dart';
+import 'package:emby_player/mpv/player/player_streams.dart';
+import 'package:emby_player/services/settings_service.dart';
+import 'package:emby_player/theme/mono_tokens.dart';
+import 'package:emby_player/utils/platform_detector.dart';
+import 'package:emby_player/widgets/video_controls/sheets/video_settings_sheet.dart';
 
 import '../test_helpers/prefs.dart';
 

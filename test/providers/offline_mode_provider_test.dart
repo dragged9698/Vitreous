@@ -1,14 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/ids.dart';
+import 'package:emby_player/media/ids.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:plezy/connection/connection.dart';
-import 'package:plezy/providers/offline_mode_provider.dart';
-import 'package:plezy/providers/multi_server_provider.dart';
-import 'package:plezy/services/data_aggregation_service.dart';
-import 'package:plezy/services/jellyfin_client.dart';
-import 'package:plezy/services/multi_server_manager.dart';
-import 'package:plezy/services/plex_auth_service.dart';
+import 'package:emby_player/connection/connection.dart';
+import 'package:emby_player/providers/offline_mode_provider.dart';
+import 'package:emby_player/providers/multi_server_provider.dart';
+import 'package:emby_player/services/data_aggregation_service.dart';
+import 'package:emby_player/services/jellyfin_client.dart';
+import 'package:emby_player/services/multi_server_manager.dart';
+import 'package:emby_player/services/plex_auth_service.dart';
 
 import '../test_helpers/prefs.dart';
 

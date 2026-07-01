@@ -241,7 +241,7 @@ class FolderTreeViewState extends State<FolderTreeView> {
   }
 
   Future<void> _handleFolderPlay(MediaItem folder) async {
-    if (folder.backend == MediaBackend.jellyfin) {
+    if (folder.backend == MediaBackend.emby) {
       final launcher = JellyfinSequentialLauncher(context: context);
       await launcher.launchFromFolder(folder: folder, shuffle: false);
       return;
@@ -260,7 +260,7 @@ class FolderTreeViewState extends State<FolderTreeView> {
   }
 
   Future<void> _handleFolderShuffle(MediaItem folder) async {
-    if (folder.backend == MediaBackend.jellyfin) {
+    if (folder.backend == MediaBackend.emby) {
       final launcher = JellyfinSequentialLauncher(context: context);
       await launcher.launchFromFolder(folder: folder, shuffle: true);
       return;
@@ -282,14 +282,14 @@ class FolderTreeViewState extends State<FolderTreeView> {
   /// backend's folder fetchers) plus Jellyfin shows/seasons, which surface as
   /// expandable media containers in folder browsing.
   bool _isFolder(MediaItem item) {
-    return item.kind == MediaKind.folder || (item.backend == MediaBackend.jellyfin && _isJellyfinMediaContainer(item));
+    return item.kind == MediaKind.folder || (item.backend == MediaBackend.emby && _isJellyfinMediaContainer(item));
   }
 
   bool _isJellyfinMediaContainer(MediaItem item) => item.kind == MediaKind.show || item.kind == MediaKind.season;
 
   bool _canPlayFolder(MediaItem item) {
-    if (item.backend == MediaBackend.plex) return true;
-    if (item.backend == MediaBackend.jellyfin) return widget.libraryKind?.isMusic != true;
+    if (item.backend == MediaBackend.emby) return true;
+    if (item.backend == MediaBackend.emby) return widget.libraryKind?.isMusic != true;
     return false;
   }
 

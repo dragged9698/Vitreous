@@ -30,7 +30,7 @@ const int defaultHubPreviewLimit = 20;
 ///
 /// Each implementation wraps the per-backend HTTP layer and exposes the same
 /// operations the rest of the app needs to browse libraries, mark watch
-/// state, and render items. Concrete classes ([PlexClient], `JellyfinClient`)
+/// state, and render items. Concrete classes ([PlexClient], `EmbyClient`)
 /// own the per-backend networking — providers and UI consume them only
 /// through this interface.
 ///
@@ -133,7 +133,10 @@ abstract class MediaServerClient {
   /// fetches values lazily per category); Jellyfin returns both in a single
   /// `/Items/Filters` call and pre-populates [LibraryFilterResult.cachedValues].
   /// Backends that have no filter listing return [LibraryFilterResult.empty].
-  Future<LibraryFilterResult> fetchLibraryFiltersWithValues(String libraryId);
+  ///
+  /// [libraryKind] scopes filter values to the item types shown in the browse
+  /// view (required for mixed movie/TV libraries on Emby/Jellyfin).
+  Future<LibraryFilterResult> fetchLibraryFiltersWithValues(String libraryId, {MediaKind? libraryKind});
 
   /// Backend-aware sort options for [libraryId]. Plex hits
   /// `/library/sections/{id}/sorts`; Jellyfin returns a hardcoded list
@@ -302,6 +305,9 @@ abstract class MediaServerClient {
   /// progress. Only call when [capabilities.continueWatchingRemoval] is true;
   /// unsupported backends throw [UnsupportedError].
   Future<void> removeFromContinueWatching(MediaItem item);
+
+  /// Toggle the per-user favorite flag for [item] on Emby/Jellyfin servers.
+  Future<void> setFavorite(MediaItem item, bool isFavorite);
 
   /// Rate the item on a 0–10 scale. Backends without numeric ratings
   /// (Jellyfin) collapse to like/dislike — see [ServerCapabilities.numericUserRating].
@@ -647,7 +653,7 @@ abstract interface class SeasonEpisodePagingClient {
 /// Cache-aware fetch helpers shared by both backends so the offline-first /
 /// network-then-cache pattern lives in one place.
 ///
-/// Originally a Plex-only inline helper; lifted into a mixin so [JellyfinClient]
+/// Originally a Plex-only inline helper; lifted into a mixin so [EmbyClient]
 /// can stop reimplementing it (and gets the missing "fall back to cache on
 /// non-network errors" branch). Mixed onto concrete [MediaServerClient]
 /// implementations — both clients use `implements MediaServerClient` so a

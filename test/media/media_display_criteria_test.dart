@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/media_display_criteria.dart';
+import 'package:emby_player/media/media_display_criteria.dart';
 
 void main() {
   group('MediaDisplayCriteria', () {

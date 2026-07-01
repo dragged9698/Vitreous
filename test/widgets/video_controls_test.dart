@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/i18n/strings.g.dart';
-import 'package:plezy/media/media_source_info.dart';
-import 'package:plezy/media/media_version.dart';
-import 'package:plezy/models/shader_preset.dart';
-import 'package:plezy/mpv/mpv.dart';
-import 'package:plezy/theme/mono_tokens.dart';
-import 'package:plezy/widgets/video_controls/video_controls.dart';
-import 'package:plezy/widgets/video_controls/painters/buffer_range_painter.dart';
-import 'package:plezy/widgets/video_controls/widgets/mobile_skip_zones.dart';
-import 'package:plezy/widgets/video_controls/widgets/skip_marker_button.dart';
-import 'package:plezy/widgets/video_controls/widgets/sync_offset_control.dart';
-import 'package:plezy/widgets/video_controls/widgets/timeline_slider.dart';
-import 'package:plezy/widgets/video_controls/widgets/video_timeline_bar.dart';
+import 'package:emby_player/i18n/strings.g.dart';
+import 'package:emby_player/media/media_source_info.dart';
+import 'package:emby_player/media/media_version.dart';
+import 'package:emby_player/models/shader_preset.dart';
+import 'package:emby_player/mpv/mpv.dart';
+import 'package:emby_player/theme/mono_tokens.dart';
+import 'package:emby_player/widgets/video_controls/video_controls.dart';
+import 'package:emby_player/widgets/video_controls/painters/buffer_range_painter.dart';
+import 'package:emby_player/widgets/video_controls/widgets/mobile_skip_zones.dart';
+import 'package:emby_player/widgets/video_controls/widgets/skip_marker_button.dart';
+import 'package:emby_player/widgets/video_controls/widgets/sync_offset_control.dart';
+import 'package:emby_player/widgets/video_controls/widgets/timeline_slider.dart';
+import 'package:emby_player/widgets/video_controls/widgets/video_timeline_bar.dart';
 
 import '../test_helpers/watch_together_fakes.dart';
 

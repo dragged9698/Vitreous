@@ -14,7 +14,7 @@ import 'package:flutter/gestures.dart'
         PointerUpEvent,
         kDoubleTapTimeout;
 import 'package:flutter/material.dart';
-import 'package:plezy/widgets/app_icon.dart';
+import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:rate_limiter/rate_limiter.dart';
 import 'package:flutter/services.dart'
@@ -31,6 +31,9 @@ import '../../services/fullscreen_state_manager.dart';
 import '../../services/macos_window_service.dart';
 import '../../services/pip_service.dart';
 import 'package:window_manager/window_manager.dart';
+import '../../models/always_on_top_mode.dart';
+import '../../services/desktop_pip_service.dart';
+import '../../services/linux_window_service.dart';
 
 import '../../mixins/settings_effect_mixin.dart';
 import '../../mixins/mounted_set_state_mixin.dart';
@@ -652,11 +655,18 @@ class _PlexVideoControlsState extends State<PlexVideoControls>
     if (_isLongPressing && _rateBeforeLongPress != null) {
       widget.player.setRate(_rateBeforeLongPress!);
     }
-    // Remove window listener and reset always-on-top if it was enabled
+    // Remove window listener; restore keep-above only when not using a persistent mode.
     if (PlatformDetector.isDesktopOS()) {
       windowManager.removeListener(this);
-      if (_isAlwaysOnTop) {
-        windowManager.setAlwaysOnTop(false);
+      final mode = SettingsService.instanceOrNull?.read(SettingsService.alwaysOnTopMode) ?? AlwaysOnTopMode.off;
+      if (mode == AlwaysOnTopMode.whenPlaying) {
+        unawaited(DesktopPipService.applyMode(mode, isPlaying: false));
+      } else if (mode == AlwaysOnTopMode.off && _isAlwaysOnTop) {
+        if (Platform.isLinux) {
+          unawaited(LinuxWindowService.setKeepAbove(false));
+        } else {
+          unawaited(windowManager.setAlwaysOnTop(false));
+        }
       }
     }
     if (Platform.isMacOS) {

@@ -1,17 +1,17 @@
 import 'package:drift/native.dart';
-import 'package:plezy/media/ids.dart';
+import 'package:emby_player/media/ids.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/database/app_database.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_item.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/media/media_server_client.dart';
-import 'package:plezy/media/playback_report_metadata.dart';
-import 'package:plezy/models/external_player_models.dart';
-import 'package:plezy/services/external_player_service.dart';
-import 'package:plezy/services/jellyfin_api_cache.dart';
-import 'package:plezy/services/multi_server_manager.dart';
-import 'package:plezy/services/offline_watch_sync_service.dart';
+import 'package:emby_player/database/app_database.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_item.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/media/media_server_client.dart';
+import 'package:emby_player/media/playback_report_metadata.dart';
+import 'package:emby_player/models/external_player_models.dart';
+import 'package:emby_player/services/external_player_service.dart';
+import 'package:emby_player/services/jellyfin_api_cache.dart';
+import 'package:emby_player/services/multi_server_manager.dart';
+import 'package:emby_player/services/offline_watch_sync_service.dart';
 
 class _RecordingClient implements MediaServerClient {
   _RecordingClient({this.backend = MediaBackend.plex});

@@ -243,6 +243,7 @@ class JellyfinMappers {
       backend: MediaBackend.jellyfin,
       title: view['Name'] as String? ?? t.libraries.fallbackTitle,
       kind: _libraryKindFromCollectionType(collectionType, view['Type'] as String?),
+      collectionType: collectionType,
       updatedAt: jellyfinIsoToEpochSeconds(view['DateLastSaved'] as String? ?? view['DateModified'] as String?),
       createdAt: jellyfinIsoToEpochSeconds(view['DateCreated'] as String?),
       hidden: false,
@@ -297,11 +298,13 @@ class JellyfinMappers {
         'photos' => MediaKind.photo,
         'boxsets' => MediaKind.collection,
         'playlists' => MediaKind.playlist,
-        'mixed' => MediaKind.unknown,
+        'mixed' => MediaKind.mixed,
         _ => MediaKind.unknown,
       };
     }
-    return MediaKind.fromString(type);
+    // Jellyfin/Emby views use Type=CollectionFolder on the wire — that marks
+    // folder *rows* in browse results, not the library itself.
+    return MediaKind.unknown;
   }
 
   static Map<String, dynamic>? _userData(Map<String, dynamic> item) {

@@ -16,6 +16,7 @@ struct _MpvPlugin {
   MpvTexture* texture;  // owned via GObject ref
   gboolean visible;
   gboolean initialized;
+  gboolean keep_above;
 };
 
 G_DEFINE_TYPE(MpvPlugin, mpv_plugin, G_TYPE_OBJECT)
@@ -65,8 +66,25 @@ static void mpv_plugin_class_init(MpvPluginClass* klass) { G_OBJECT_CLASS(klass)
 static void mpv_plugin_init(MpvPlugin* self) {
   self->visible = FALSE;
   self->initialized = FALSE;
+  self->keep_above = FALSE;
   self->texture = nullptr;
   self->texture_registrar = nullptr;
+}
+
+static GtkWindow* mpv_plugin_toplevel(MpvPlugin* self) {
+  if (!self->registrar) return nullptr;
+  FlView* view = fl_plugin_registrar_get_view(self->registrar);
+  if (!view) return nullptr;
+  GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(view));
+  if (!GTK_IS_WINDOW(toplevel)) return nullptr;
+  return GTK_WINDOW(toplevel);
+}
+
+static void mpv_plugin_apply_keep_above(MpvPlugin* self, gboolean keep_above) {
+  GtkWindow* window = mpv_plugin_toplevel(self);
+  if (window) gtk_window_set_keep_above(window, keep_above);
+  if (self->player) self->player->SetEmbedKeepAbove(keep_above == TRUE);
+  self->keep_above = keep_above;
 }
 
 MpvPlugin* mpv_plugin_new(FlPluginRegistrar* registrar) {
@@ -103,17 +121,36 @@ static void mpv_plugin_handle_method_call(FlMethodChannel* channel, FlMethodCall
   g_autoptr(FlMethodResponse) response = nullptr;
 
   if (strcmp(method, "initialize") == 0) {
-    if (self->initialized && self->texture) {
-      // Already initialized — return existing texture ID
-      response =
-          FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_int(mpv_texture_get_id(self->texture))));
+    FlValue* embed_value = args != nullptr ? fl_value_lookup_string(args, "embed") : nullptr;
+    const bool embed =
+        embed_value != nullptr && fl_value_get_type(embed_value) == FL_VALUE_TYPE_BOOL && fl_value_get_bool(embed_value);
+
+    if (self->initialized && self->player && !self->player->IsDisposed()) {
+      if (embed && self->player->UsesEmbed()) {
+        response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_int(-1)));
+      } else if (!embed && self->texture) {
+        response =
+            FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_int(mpv_texture_get_id(self->texture))));
+      } else {
+        response = FL_METHOD_RESPONSE(
+            fl_method_error_response_new("INIT_FAILED", "Player already initialized in a different mode", nullptr));
+      }
     } else {
-      // Create player if it was disposed or doesn't exist
       if (!self->player || self->player->IsDisposed()) {
         self->player = std::make_unique<mpv::MpvPlayer>();
       }
 
-      if (self->player->Initialize()) {
+      if (embed) {
+        FlView* view = fl_plugin_registrar_get_view(self->registrar);
+        if (self->player->InitializeEmbed(GTK_WIDGET(view))) {
+          self->initialized = TRUE;
+          self->player->SetEventCallback([self](FlValue* event) { send_event(self, event); });
+          response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_int(-1)));
+        } else {
+          response = FL_METHOD_RESPONSE(
+              fl_method_error_response_new("INIT_FAILED", "Failed to initialize MPV HDR embed player", nullptr));
+        }
+      } else if (self->player->Initialize()) {
         // Create the FlTextureGL and register it
         FlView* view = fl_plugin_registrar_get_view(self->registrar);
         self->texture = mpv_texture_new(self->player.get(), self->texture_registrar, view);
@@ -279,6 +316,10 @@ static void mpv_plugin_handle_method_call(FlMethodChannel* channel, FlMethodCall
     } else {
       self->visible = fl_value_get_bool(visible_value);
 
+      if (self->player) {
+        self->player->SetVisible(self->visible);
+      }
+
       if (self->visible && self->texture) {
         // Trigger a frame render when becoming visible
         mpv_texture_mark_frame_available(self->texture);
@@ -291,9 +332,40 @@ static void mpv_plugin_handle_method_call(FlMethodChannel* channel, FlMethodCall
       mpv_texture_mark_frame_available(self->texture);
     }
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+  } else if (strcmp(method, "setVideoRect") == 0) {
+    if (!self->player || !self->initialized) {
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new("NOT_INITIALIZED", "Player not initialized", nullptr));
+    } else {
+      auto read_int = [&](const char* key) -> int {
+        FlValue* value = fl_value_lookup_string(args, key);
+        return (value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_INT)
+            ? static_cast<int>(fl_value_get_int(value))
+            : 0;
+      };
+      auto read_double = [&](const char* key) -> double {
+        FlValue* value = fl_value_lookup_string(args, key);
+        return (value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_FLOAT)
+            ? fl_value_get_float(value)
+            : 1.0;
+      };
+
+      self->player->SetVideoRect(
+          read_int("left"), read_int("top"), read_int("right"), read_int("bottom"), read_double("devicePixelRatio"));
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+    }
   } else if (strcmp(method, "isInitialized") == 0) {
     gboolean initialized = self->player && self->initialized;
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_bool(initialized)));
+  } else if (strcmp(method, "setKeepAbove") == 0) {
+    FlValue* value = args != nullptr ? fl_value_lookup_string(args, "value") : nullptr;
+    if (value == nullptr || fl_value_get_type(value) != FL_VALUE_TYPE_BOOL) {
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new("INVALID_ARGS", "Missing 'value'", nullptr));
+    } else {
+      mpv_plugin_apply_keep_above(self, fl_value_get_bool(value));
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_bool(TRUE)));
+    }
+  } else if (strcmp(method, "isKeepAbove") == 0) {
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_bool(self->keep_above)));
   } else {
     response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
   }

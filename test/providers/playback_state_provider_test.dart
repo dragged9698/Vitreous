@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_item.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/media/play_queue.dart';
-import 'package:plezy/models/plex/play_queue_response.dart';
-import 'package:plezy/providers/playback_state_provider.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_item.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/media/play_queue.dart';
+import 'package:emby_player/models/plex/play_queue_response.dart';
+import 'package:emby_player/providers/playback_state_provider.dart';
 
 PlexMediaItem _item(String ratingKey, int playQueueItemID) => PlexMediaItem(
   id: ratingKey,

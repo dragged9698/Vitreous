@@ -12,6 +12,7 @@ import '../../utils/json_utils.dart';
 import '../settings_service.dart';
 import '../trackers/tracker.dart';
 import '../trackers/tracker_constants.dart';
+import '../trackers/tracker_exceptions.dart';
 import '../trackers/tracker_id_resolver.dart';
 import '../trackers/tracker_rating_match.dart';
 import '../trackers/tracker_session.dart';
@@ -100,7 +101,18 @@ class TraktScrobbleService implements TrackerRatingSource {
     final localIds = TraktIds.fromExternal(ctx.ids.external).toJson();
     if (localIds.isEmpty) throw const TrackerRatingUnavailableException('Trakt');
 
-    final entries = await client.getRatings(_ratingType(ctx));
+    List<dynamic> entries;
+    try {
+      entries = await client.getRatings(_ratingType(ctx));
+    } on TrackerApiException catch (e) {
+      // Trakt locks sync endpoints when a collection exceeds 100k items.
+      // Rating submission still works; we just can't bulk-load prior scores.
+      if (e.isAccountLocked) {
+        appLogger.d('Trakt ratings list unavailable (account locked)', error: e);
+        return null;
+      }
+      rethrow;
+    }
     for (final entry in entries) {
       if (entry is! Map) continue;
       if (!_ratingEntryMatches(ctx, entry.cast<String, dynamic>(), localIds)) continue;

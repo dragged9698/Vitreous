@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/utils/base_notifier.dart';
+import 'package:emby_player/utils/base_notifier.dart';
 
 class _IntNotifier extends BaseNotifier<int> {}
 

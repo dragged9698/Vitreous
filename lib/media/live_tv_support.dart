@@ -138,7 +138,12 @@ abstract class LiveTvSupport {
   /// Jellyfin returns a negotiated stream URL plus the play session id. Plex
   /// returns `null` because its stream URL is only valid after a tune;
   /// playback callers use [startPlayback], which owns that difference.
-  Future<LiveTvStreamResolution?> resolveStreamUrl(String channelKey, {String? dvrKey});
+  Future<LiveTvStreamResolution?> resolveStreamUrl(
+    String channelKey, {
+    String? dvrKey,
+    bool directStream = true,
+    bool directStreamAudio = true,
+  });
 
   /// Start a playback session for [channelKey] — the single entry the player
   /// uses for initial launch and channel switching. Plex requires [dvrKey]

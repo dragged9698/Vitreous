@@ -1,9 +1,9 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/models/hotkey_model.dart';
-import 'package:plezy/services/settings_service.dart';
-import 'package:plezy/services/trackers/tracker_constants.dart';
-import 'package:plezy/utils/platform_detector.dart';
+import 'package:emby_player/models/hotkey_model.dart';
+import 'package:emby_player/services/settings_service.dart';
+import 'package:emby_player/services/trackers/tracker_constants.dart';
+import 'package:emby_player/utils/platform_detector.dart';
 
 import '../test_helpers/prefs.dart';
 

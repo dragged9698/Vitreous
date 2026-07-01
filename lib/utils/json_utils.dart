@@ -80,3 +80,23 @@ List<String>? stringListFromRaw(Object? raw, {String? mapKey, bool stringify = f
 }
 
 List<T>? nullIfEmptyList<T>(List<T> values) => values.isEmpty ? null : values;
+
+/// Read a string field from Emby/Jellyfin JSON (PascalCase or camelCase wire names).
+String? jsonStringField(Map<String, dynamic> json, String pascalCase) {
+  if (pascalCase.isEmpty) return null;
+  final camel = '${pascalCase[0].toLowerCase()}${pascalCase.substring(1)}';
+  final raw = json[pascalCase] ?? json[camel];
+  if (raw is String) return raw.isEmpty ? null : raw;
+  return raw?.toString();
+}
+
+/// Compare backend GUID strings case-insensitively, ignoring braces and dashes.
+bool jsonIdsEqual(String? a, String? b) {
+  if (a == null || b == null) return false;
+  final left = _normalizeJsonId(a);
+  final right = _normalizeJsonId(b);
+  if (left.isEmpty || right.isEmpty) return false;
+  return left == right;
+}
+
+String _normalizeJsonId(String id) => id.trim().replaceAll(RegExp(r'[{}-]'), '').toLowerCase();

@@ -62,11 +62,7 @@ abstract class LibraryAlphaBarStrategy {
     required bool isShared,
   }) {
     return switch (backend) {
-      MediaBackend.plex => PlexAlphaBarStrategy(
-        plexClientProvider: plexClientProvider,
-        libraryKey: libraryKey,
-        isShared: isShared,
-      ),
+      MediaBackend.emby => const JellyfinAlphaBarStrategy(),
       MediaBackend.jellyfin => const JellyfinAlphaBarStrategy(),
     };
   }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:plezy/widgets/app_icon.dart';
+import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../focus/focusable_button.dart';
 import '../../focus/input_mode_tracker.dart';
@@ -44,6 +44,8 @@ class FiltersBottomSheet extends StatefulWidget {
 }
 
 class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
+  static const _exclusiveCategoricalFilters = {'genre', 'year', 'contentRating', 'tag'};
+
   MediaFilter? _currentFilter;
   List<MediaFilterValue> _filterValues = [];
   bool _isLoadingValues = false;
@@ -152,6 +154,27 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
     OverlaySheetController.of(context).close();
   }
 
+  void _selectCategoricalValue(MediaFilter filter, String filterValue, String displayTitle) {
+    setState(() {
+      for (final key in _exclusiveCategoricalFilters) {
+        if (key != filter.filter) _tempSelectedFilters.remove(key);
+      }
+      _tempSelectedFilters[filter.filter] = filterValue;
+      if (_filterDisplayNames.length > _maxCachedDisplayNames) {
+        _filterDisplayNames.clear();
+      }
+      _filterDisplayNames[_cacheKey(filter.filter, filterValue)] = displayTitle;
+    });
+    _applyFilters();
+  }
+
+  void _clearCategoricalFilter(MediaFilter filter) {
+    setState(() {
+      _tempSelectedFilters.remove(filter.filter);
+    });
+    _applyFilters();
+  }
+
   String _extractFilterValue(String key, String filterName) {
     if (key.contains('?')) {
       final queryStart = key.indexOf('?');
@@ -208,12 +231,7 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
             autofocus: autofocusFirst,
             title: Text(t.libraries.all),
             selected: isSelected,
-            onTap: () {
-              setState(() {
-                _tempSelectedFilters.remove(filter.filter);
-              });
-              _applyFilters();
-            },
+            onTap: () => _clearCategoricalFilter(filter),
           );
         }
 
@@ -224,17 +242,7 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
         return FocusableListTile(
           title: Text(value.title),
           selected: isSelected,
-          onTap: () {
-            setState(() {
-              _tempSelectedFilters[filter.filter] = filterValue;
-              // Cache the display name for this filter value.
-              if (_filterDisplayNames.length > _maxCachedDisplayNames) {
-                _filterDisplayNames.clear();
-              }
-              _filterDisplayNames[_cacheKey(filter.filter, filterValue)] = value.title;
-            });
-            _applyFilters();
-          },
+          onTap: () => _selectCategoricalValue(filter, filterValue, value.title),
         );
       },
     );

@@ -1,20 +1,20 @@
 import 'dart:async';
-import 'package:plezy/media/ids.dart';
+import 'package:emby_player/media/ids.dart';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/database/app_database.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_item.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/media/media_source_info.dart';
-import 'package:plezy/media/playback_report_metadata.dart';
-import 'package:plezy/mpv/mpv.dart';
-import 'package:plezy/services/multi_server_manager.dart';
-import 'package:plezy/services/offline_watch_sync_service.dart';
-import 'package:plezy/services/playback_progress_tracker.dart';
-import 'package:plezy/services/plex_client.dart';
-import 'package:plezy/utils/watch_state_notifier.dart';
+import 'package:emby_player/database/app_database.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_item.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/media/media_source_info.dart';
+import 'package:emby_player/media/playback_report_metadata.dart';
+import 'package:emby_player/mpv/mpv.dart';
+import 'package:emby_player/services/multi_server_manager.dart';
+import 'package:emby_player/services/offline_watch_sync_service.dart';
+import 'package:emby_player/services/playback_progress_tracker.dart';
+import 'package:emby_player/services/plex_client.dart';
+import 'package:emby_player/utils/watch_state_notifier.dart';
 
 import '../test_helpers/prefs.dart';
 

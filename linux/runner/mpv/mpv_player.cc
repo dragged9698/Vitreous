@@ -9,6 +9,7 @@
 #endif
 #ifdef GDK_WINDOWING_WAYLAND
 #include <gdk/gdkwayland.h>
+#include <wayland-client.h>
 #endif
 #include <clocale>
 
@@ -41,9 +42,15 @@ bool MpvPlayer::Initialize() {
     return false;
   }
 
-  // Configure mpv for embedded playback.
+  // Configure mpv for embedded playback (Linux desktop tuning).
   mpv_set_option_string(mpv_, "vo", "libmpv");
-  mpv_set_option_string(mpv_, "hwdec", "auto");
+  mpv_set_option_string(mpv_, "hwdec", "auto-safe");
+  mpv_set_option_string(mpv_, "hwdec-codecs", "all");
+  mpv_set_option_string(mpv_, "gpu-hwdec-interop", "auto");
+  mpv_set_option_string(mpv_, "cache", "no");
+  mpv_set_option_string(mpv_, "demuxer-readahead-secs", "1");
+  mpv_set_option_string(mpv_, "audio-spdif", "ac3,eac3,dts,dts-hd,truehd,flac,alac,opus");
+  mpv_set_option_string(mpv_, "audio-channels", "auto");
   mpv_set_option_string(mpv_, "keep-open", "yes");
 
   // HDR tone mapping
@@ -120,7 +127,7 @@ bool MpvPlayer::InitRenderContext() {
   eglBindAPI(EGL_OPENGL_ES_API);
   EGLint context_attribs[] = {
       EGL_CONTEXT_CLIENT_VERSION,
-      2,
+      3,
       EGL_NONE,
   };
   egl_context_ = eglCreateContext(egl_display_, config, EGL_NO_CONTEXT, context_attribs);
@@ -177,7 +184,9 @@ bool MpvPlayer::InitRenderContext() {
   // Set up render update callback.
   mpv_render_context_set_update_callback(mpv_gl_, OnMpvRenderUpdate, this);
 
-  g_message("MPV: Render context created with isolated EGL context");
+  ApplyToneMappingFallback();
+
+  g_message("MPV: Render context created with isolated EGL context (GLES 3)");
   return true;
 }
 
@@ -227,6 +236,13 @@ void MpvPlayer::Dispose() {
   if (event_source_id_ != 0) {
     g_source_remove(event_source_id_);
     event_source_id_ = 0;
+  }
+
+  if (embed_window_) {
+    gtk_widget_destroy(GTK_WIDGET(embed_window_));
+    embed_window_ = nullptr;
+    embed_video_ = nullptr;
+    flutter_view_ = nullptr;
   }
 
   // 6. Free render context and mpv handle in a background thread.
@@ -314,6 +330,12 @@ void MpvPlayer::SetProperty(const std::string& name, const std::string& value) {
 void MpvPlayer::SetPropertyAsync(const std::string& name, const std::string& value, StatusCallback callback) {
   if (disposed_ || !mpv_) {
     if (callback) callback(0);
+    return;
+  }
+
+  if (name == "hdr-enabled") {
+    bool enabled = (value == "yes" || value == "true" || value == "1");
+    SetHDREnabled(enabled, std::move(callback));
     return;
   }
 
@@ -587,6 +609,7 @@ void MpvPlayer::HandleMpvEvent(mpv_event* event) {
       break;
     }
     case MPV_EVENT_FILE_LOADED: {
+      ApplyToneMappingFallback();
       SendEvent("file-loaded");
       break;
     }
@@ -668,6 +691,176 @@ void MpvPlayer::SendEvent(const std::string& name, FlValue* data) {
     event_callback_(event_map);
   }
   fl_value_unref(event_map);
+}
+
+int64_t MpvPlayer::EmbedWindowId(GtkWidget* widget) {
+  if (!widget) return 0;
+
+  GtkWidget* toplevel = gtk_widget_get_toplevel(widget);
+  if (!gtk_widget_get_realized(toplevel)) {
+    gtk_widget_realize(toplevel);
+  }
+  if (!gtk_widget_get_realized(widget)) {
+    gtk_widget_realize(widget);
+  }
+
+  GdkWindow* gdk_window = gtk_widget_get_window(widget);
+  if (!gdk_window) return 0;
+
+#ifdef GDK_WINDOWING_WAYLAND
+  GdkDisplay* display = gdk_window_get_display();
+  if (GDK_IS_WAYLAND_DISPLAY(display)) {
+    struct wl_surface* surface = gdk_wayland_window_get_wl_surface(gdk_window);
+    return reinterpret_cast<int64_t>(surface);
+  }
+#endif
+#ifdef GDK_WINDOWING_X11
+  if (GDK_IS_X11_WINDOW(gdk_window)) {
+    return static_cast<int64_t>(gdk_x11_window_get_xid(gdk_window));
+  }
+#endif
+  return 0;
+}
+
+bool MpvPlayer::InitializeEmbed(GtkWidget* flutter_view) {
+  if (mpv_) {
+    return true;
+  }
+
+  if (!flutter_view) {
+    g_warning("MPV: InitializeEmbed requires a Flutter view");
+    return false;
+  }
+
+  embed_mode_ = true;
+  flutter_view_ = flutter_view;
+
+  std::setlocale(LC_NUMERIC, "C");
+
+  GtkWidget* toplevel = gtk_widget_get_toplevel(flutter_view);
+  embed_window_ = GTK_WINDOW(gtk_window_new(GTK_WINDOW_POPUP));
+  gtk_window_set_decorated(embed_window_, FALSE);
+  gtk_window_set_skip_taskbar_hint(embed_window_, TRUE);
+  gtk_window_set_skip_pager_hint(embed_window_, TRUE);
+  if (GTK_IS_WINDOW(toplevel)) {
+    gtk_window_set_transient_for(embed_window_, GTK_WINDOW(toplevel));
+  }
+
+  embed_video_ = gtk_drawing_area_new();
+  gtk_widget_set_app_paintable(embed_video_, TRUE);
+  gtk_container_add(GTK_CONTAINER(embed_window_), embed_video_);
+  gtk_widget_show_all(GTK_WIDGET(embed_window_));
+  if (embed_keep_above_) {
+    gtk_window_set_keep_above(embed_window_, TRUE);
+  }
+
+  mpv_ = mpv_create();
+  if (!mpv_) {
+    g_warning("MPV: mpv_create() failed (embed mode)");
+    return false;
+  }
+
+  int64_t wid = EmbedWindowId(embed_video_);
+  if (wid == 0) {
+    g_warning("MPV: Failed to obtain embed window id");
+    mpv_destroy(mpv_);
+    mpv_ = nullptr;
+    return false;
+  }
+
+  mpv_set_option(mpv_, "wid", MPV_FORMAT_INT64, &wid);
+  mpv_set_option_string(mpv_, "vo", "gpu-next");
+  mpv_set_option_string(mpv_, "gpu-api", "auto");
+  mpv_set_option_string(mpv_, "hwdec", "auto-safe");
+  mpv_set_option_string(mpv_, "cache", "no");
+  mpv_set_option_string(mpv_, "demuxer-readahead-secs", "1");
+  mpv_set_option_string(mpv_, "keep-open", "yes");
+  mpv_set_option_string(mpv_, "target-colorspace-hint", "auto");
+  mpv_set_option_string(mpv_, "tone-mapping", "auto");
+  mpv_set_option_string(mpv_, "hdr-compute-peak", "auto");
+  mpv_set_option_string(mpv_, "idle", "yes");
+  mpv_set_option_string(mpv_, "input-default-bindings", "no");
+  mpv_set_option_string(mpv_, "input-vo-keyboard", "no");
+  mpv_set_option_string(mpv_, "osc", "no");
+  mpv_set_option_string(mpv_, "terminal", "no");
+  mpv_request_log_messages(mpv_, "warn");
+
+  int err = mpv_initialize(mpv_);
+  if (err < 0) {
+    g_warning("MPV: mpv_initialize() failed (embed): %s", mpv_error_string(err));
+    mpv_destroy(mpv_);
+    mpv_ = nullptr;
+    return false;
+  }
+
+  hdr_enabled_ = true;
+  mpv_set_wakeup_callback(mpv_, OnMpvWakeup, this);
+  mpv_observe_property(mpv_, 0, "video-params/sig-peak", MPV_FORMAT_DOUBLE);
+
+  g_message("MPV: HDR embed initialization successful (gpu-next)");
+  return true;
+}
+
+void MpvPlayer::ApplyToneMappingFallback() {
+  if (disposed_ || !mpv_ || embed_mode_) return;
+
+  char* peak_detection = nullptr;
+  int err = mpv_get_property(mpv_, "hdr-compute-peak", MPV_FORMAT_STRING, &peak_detection);
+  if (err < 0 || peak_detection == nullptr) {
+    return;
+  }
+
+  const bool has_compute = strcmp(peak_detection, "no") != 0;
+  if (!has_compute) {
+    g_message("MPV: No GLES compute shaders — using reinhard tone mapping");
+    mpv_set_option_string(mpv_, "tone-mapping", "reinhard");
+    mpv_set_property_string(mpv_, "tone-mapping-param", "0.7");
+    mpv_set_property_string(mpv_, "tone-mapping-mode", "luma");
+  }
+  mpv_free(peak_detection);
+}
+
+void MpvPlayer::SetHDREnabled(bool enabled, StatusCallback callback) {
+  hdr_enabled_ = enabled;
+
+  if (!mpv_) {
+    if (callback) callback(0);
+    return;
+  }
+
+  uint64_t request_id = callback ? RegisterStatusRequest(std::move(callback)) : 0;
+  const char* value = enabled ? "auto" : "no";
+  int result = mpv_set_property_async(mpv_, request_id, "target-colorspace-hint", MPV_FORMAT_STRING, &value);
+  if (result < 0) {
+    auto cb = TakeStatusRequest(request_id);
+    if (cb) cb(result);
+  }
+}
+
+void MpvPlayer::SetVideoRect(int left, int top, int right, int bottom, double device_pixel_ratio) {
+  (void)device_pixel_ratio;
+  if (!embed_mode_ || !embed_window_ || disposed_) return;
+
+  const int width = std::max(1, right - left);
+  const int height = std::max(1, bottom - top);
+  gtk_window_resize(embed_window_, width, height);
+  gtk_window_move(embed_window_, left, top);
+}
+
+void MpvPlayer::SetVisible(bool visible) {
+  if (!embed_mode_ || !embed_window_ || disposed_) return;
+  if (visible) {
+    gtk_widget_show_all(GTK_WIDGET(embed_window_));
+  } else {
+    gtk_widget_hide(GTK_WIDGET(embed_window_));
+  }
+}
+
+void MpvPlayer::SetEmbedKeepAbove(bool keep_above) {
+  embed_keep_above_ = keep_above;
+  if (embed_window_) {
+    gtk_window_set_keep_above(embed_window_, keep_above ? TRUE : FALSE);
+  }
 }
 
 }  // namespace mpv

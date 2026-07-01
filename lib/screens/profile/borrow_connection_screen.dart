@@ -211,8 +211,9 @@ class _BorrowConnectionScreenState extends State<BorrowConnectionScreen> {
       switch (cand.connection) {
         case PlexAccountConnection():
           await _borrowPlex(cand);
+        case EmbyConnection():
         case JellyfinConnection():
-          await _borrowJellyfin(cand);
+          await _borrowMediaServer(cand);
       }
     } finally {
       if (mounted) {
@@ -331,15 +332,19 @@ class _BorrowConnectionScreenState extends State<BorrowConnectionScreen> {
     }
   }
 
-  Future<void> _borrowJellyfin(_BorrowCandidate cand) async {
-    final jelly = cand.connection as JellyfinConnection;
+  Future<void> _borrowMediaServer(_BorrowCandidate cand) async {
+    final (connectionId, accessToken, userId) = switch (cand.connection) {
+      EmbyConnection(:final id, :final accessToken, :final userId) => (id, accessToken, userId),
+      JellyfinConnection(:final id, :final accessToken, :final userId) => (id, accessToken, userId),
+      _ => throw StateError('Expected Emby or Jellyfin connection, got ${cand.connection.runtimeType}'),
+    };
     final pcRegistry = context.read<ProfileConnectionRegistry>();
     await pcRegistry.upsert(
       ProfileConnection(
         profileId: widget.targetProfile.id,
-        connectionId: jelly.id,
-        userToken: cand.pc.hasToken ? cand.pc.userToken : jelly.accessToken,
-        userIdentifier: cand.pc.userIdentifier.isNotEmpty ? cand.pc.userIdentifier : jelly.userId,
+        connectionId: connectionId,
+        userToken: cand.pc.hasToken ? cand.pc.userToken : accessToken,
+        userIdentifier: cand.pc.userIdentifier.isNotEmpty ? cand.pc.userIdentifier : userId,
         tokenAcquiredAt: DateTime.now(),
       ),
     );

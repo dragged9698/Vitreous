@@ -1,0 +1,167 @@
+---
+description: Liquid Glass UI — iOS 26 navigation chrome via liquid_glass_widgets; glass vs opaque content; GlassScaffold patterns for Emby Player rewrite
+globs: "{lib/widgets,lib/screens,lib/theme,lib/navigation}/**,lib/main.dart"
+alwaysApply: false
+---
+
+# Liquid Glass UI (`liquid_glass_widgets`)
+
+**Exclusive UI kit** for the upcoming rewrite. Package: [sdegenaar/liquid_glass_widgets](https://github.com/sdegenaar/liquid_glass_widgets) (pub: `liquid_glass_widgets`).
+
+Requires **Flutter ≥ 3.41** (project already on 3.44+). Query **Context7** for `liquid_glass_widgets` before guessing widget APIs.
+
+## Setup (app root — once)
+
+```dart
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await LiquidGlassWidgets.initialize(); // pre-warm shaders — avoids first-frame flash
+
+  // Inside Sentry/runApp wrapper:
+  runApp(LiquidGlassWidgets.wrap(
+    child: const EmbyPlayerApp(),
+    adaptiveQuality: true, // experimental — persist settled quality via SettingsService (see below)
+    theme: GlassThemeData.simple(
+      blur: 10,
+      thickness: 30,
+      quality: GlassQuality.standard,
+    ),
+  ));
+}
+```
+
+**Persist adaptive quality** across cold starts (recommended for Linux/Android mid-range):
+
+```dart
+// Load saved GlassQuality from SharedPreferences → adaptiveConfig.initialQuality
+// onQualityChanged → persist quality name — see package README "Eliminating repeat warmup jank"
+```
+
+Accessibility (Reduce Motion / Reduce Transparency) is **automatic** — do not disable unless user-facing setting.
+
+## Glass vs content — non-negotiable
+
+Glass is **navigation and control chrome only**. Content stays **opaque** — same rule as iOS 26.
+
+| ✅ Glass | ❌ Opaque (standard Material/Cupertino) |
+|----------|----------------------------------------|
+| App bars, tab bars, bottom bars, toolbars | `MediaCard`, library grids, episode tiles |
+| Side nav **chrome** (floating rail shell) | Poster/backdrop art, hero imagery |
+| Sheets, dialogs, menus, popovers, toasts | Settings **row content** (use list tiles) |
+| FABs, segmented controls, search bars | **Video player** surface and controls stack |
+| `GlassSwitch`, `GlassSlider`, `GlassChip` in toolbars | Full-screen browse backgrounds |
+
+```
+┌──────────────────────────┐
+│   GlassAppBar (glass)    │  ← chrome
+├──────────────────────────┤
+│   Opaque content         │  ← ListView, MediaCard, grids
+│   (MonoTokens / Theme)   │
+├──────────────────────────┤
+│  GlassBottomBar (glass)  │  ← chrome
+└──────────────────────────┘
+```
+
+**Settings:** `GlassScaffold` + `GlassAppBar` for chrome; **opaque** `ListTile` / `CupertinoListTile` rows in body. Optional: `GlassGroupedSection` for grouped glass-styled sections only when design calls for it — not every row.
+
+## Primary pattern: `GlassScaffold`
+
+Default for **all standard screens** (libraries, settings, hub, auth shell). Replaces `Scaffold` + manual transparent background + `FocusedScrollScaffold` chrome.
+
+```dart
+GlassScaffold(
+  background: _appBackdrop(context), // fanart gradient, blurred library art, or themed wallpaper
+  statusBarStyle: GlassStatusBarStyle.auto,
+  contentAwareBrightness: true,
+  appBar: GlassAppBar(title: Text(t.libraries.title)),
+  bottomBar: GlassTabBar.bottom(/* main tabs */),
+  body: CustomScrollView(slivers: [/* opaque content slivers */]),
+)
+```
+
+| Need | Widget |
+|------|--------|
+| Screen with app bar / tab bar | **`GlassScaffold`** (default) |
+| Custom stack layout (main shell + side rail) | **`GlassPage`** + manual `Stack`, or extend shell widget |
+| Modal / picker | **`GlassSheet`**, **`GlassModalSheet`**, **`GlassDialog`** |
+| Context menu | **`GlassMenu`** + **`GlassMenuItem`** (Liquid Morph engine) |
+| Toolbar actions | **`GlassButton`**, **`GlassIconButton`**, **`GlassButtonGroup`** |
+| Search | **`GlassSearchBar`** or **`GlassTabBar.searchable()`** |
+| Low-level one-off glass panel | **`GlassCard`** / **`GlassContainer`** — not the default for whole screens |
+
+Do **not** assemble `GlassPage` + `Scaffold` + `GlassScrollEdgeEffect` + `Stack` manually when `GlassScaffold` covers the case.
+
+## Emby Player screen mapping
+
+| Current surface | Target | Notes |
+|-----------------|--------|-------|
+| `MainScreen` shell | `GlassScaffold` or `GlassPage` + opaque body | Keep provider/focus logic; swap chrome |
+| `SideNavigationRail` | Glass sidebar chrome + **opaque** `NavigationRailItem` content | Preserve `DpadNavigator` / focus nodes — glass wraps chrome, not focus target internals |
+| `SettingsPage` / `FocusedScrollScaffold` | `GlassScaffold` + `GlassAppBar` + opaque sliver list | Rows stay Material/Cupertino |
+| `MediaCard`, `EpisodeCard`, grids | **No glass** — keep opaque cards | Use `MonoTokens` / `Theme` |
+| `video_player` screen | **Opaque** player + optional glass **overlay** controls only | Never glass the video texture |
+| `OverlaySheet`, bottom sheets | `GlassModalSheet` / `GlassSheet` | Migrate gradually |
+| Dialogs / PIN entry | `GlassDialog` | |
+| Auth / profile switch | `GlassScaffold` + opaque form content | |
+
+## Quality & performance (Linux + TV)
+
+| Surface | Quality | Why |
+|---------|---------|-----|
+| App bar, bottom bar, side rail shell | `standard`; Impeller mobile may promote via `GlassIsolationScope` | Fixed chrome |
+| Scrollable lists / grids | **opaque** — no glass cards in list | GPU budget |
+| Hero / static feature panel | `premium` on Impeller only; **never** inside scroll views | Shader cost |
+| Low-end / many glass elements | `GlassQuality.minimal` for secondary panels | Zero shader in scroll |
+| Linux desktop (Skia) | `standard` default; lightweight shader path | Auto-detected |
+
+Enable `adaptiveQuality: true` in `wrap()`; persist settled tier to avoid 3s warmup jank every launch.
+
+**Debug only:** `GlassPerformanceMonitor` via `LiquidGlassWidgets.initialize()` — zero cost in release.
+
+## Theming bridge
+
+- App-wide glass defaults: `LiquidGlassWidgets.wrap(theme: GlassThemeData(...))`.
+- Opaque content: keep **`MonoTokens`** / `ThemeExtension` for surfaces, text, radii on cards and lists.
+- Override hierarchy (highest wins): widget `settings` → `GlassPage(themeOverride:)` → `wrap(theme:)`.
+- Per-subtree: `GlassTheme(data: GlassThemeData.simple(...), child: ...)`.
+
+Do not duplicate color hex in glass widgets — use `GlassThemeData` + `GlassGlowColors` for interaction glow on bars.
+
+## TV / D-pad / gamepad
+
+- **Focus system stays** — `lib/focus/`, `FocusableMediaCard`, `DpadNavigator` are unchanged.
+- Glass bars must not steal focus from content rail; verify RIGHT/LEFT between sidebar and grid after migration.
+- `contentAwareBrightness: true` on `GlassScaffold` when content scrolls under floating bars (hub/library).
+- 10-foot targets: prefer `GlassButton` size defaults; test with `GamepadService`.
+
+## Migration rules
+
+1. **Chrome first** — `main.dart` wrap + one pilot screen (`SettingsPage` or library hub).
+2. **Extract shared shell** — e.g. `EmbyGlassShell` wrapping `GlassScaffold` with backdrop + tab bar wiring.
+3. **Leave providers/services untouched** — UI-only diff per screen.
+4. **Delete replaced scaffolds** only after all call sites migrate (`FocusedScrollScaffold`, duplicate app bars).
+5. Reference package examples: `example/lib/demos/nav_bar_patterns_demo.dart`, `content_aware_brightness_demo.dart`, Apple News demo (article tiles = opaque).
+
+## Widget catalog (quick reference)
+
+**Surfaces:** `GlassScaffold`, `GlassAppBar`, `GlassTabBar`, `GlassToolbar`, `GlassPage`  
+**Interactive:** `GlassButton`, `GlassIconButton`, `GlassSegmentedControl`, `GlassSwitch`, `GlassSlider`, `GlassChip`  
+**Input:** `GlassTextField`, `GlassSearchBar`, `GlassPicker`  
+**Overlays:** `GlassDialog`, `GlassSheet`, `GlassModalSheet`, `GlassMenu`, `showGlassActionSheet`  
+**Containers (sparingly):** `GlassCard`, `GlassGroupedSection`, `GlassListTile` — not for media grids
+
+## Forbidden
+
+- `GlassCard` / `GlassContainer` wrapping **`MediaCard`** or poster grids
+- Glass on **`Player` / video texture** / MPV overlay background
+- Raw `Scaffold` with transparent background on new screens — use `GlassScaffold`
+- `GlassQuality.premium` inside `ListView` / `CustomScrollView` slivers
+- Removing accessibility fallbacks (`respectSystemAccessibility: false`) without product approval
+- New Material `AppBar` / `NavigationBar` on migrated screens — use glass equivalents
+- Hardcoded strings — still use slang `t.*`
+
+## References
+
+- Package README + `docs/LIQUID_MORPH_ENGINE.md`, `docs/ADAPTIVE_QUALITY.md`
+- Example apps: `example/showcase` (Wanderlust), `example/lib/apple_news/`, widget showcase
+- Project: `platform-input.mdc` (TV), `i18n-slang.mdc`, `playback-mpv.mdc` (player stays opaque)

@@ -5,7 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:plezy/widgets/app_icon.dart';
+import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:path/path.dart' as path;
 
@@ -14,9 +14,11 @@ import 'package:provider/provider.dart';
 import '../../../models/shader_preset.dart';
 import '../../../models/transcode_quality_preset.dart';
 import '../../../media/media_version.dart';
+import '../../../media/media_item.dart';
 import '../../../mpv/mpv.dart';
 import '../../../providers/shader_provider.dart';
 import '../../../services/file_picker_service.dart';
+import '../../../services/playback_speed_memory_service.dart';
 import '../../../services/settings_service.dart';
 import '../../../services/shader_service.dart';
 import '../../../services/sleep_timer_service.dart';
@@ -166,6 +168,7 @@ class VideoSettingsSheet extends StatefulWidget {
 
   /// Called when a sync offset changes (so the parent can update its state).
   final void Function(String propertyName, int offset)? onSyncOffsetChanged;
+  final MediaItem? playbackMetadata;
 
   const VideoSettingsSheet({
     super.key,
@@ -191,6 +194,7 @@ class VideoSettingsSheet extends StatefulWidget {
     this.onCancelAutoHide,
     this.onStartAutoHide,
     this.onSyncOffsetChanged,
+    this.playbackMetadata,
   });
 
   @override
@@ -512,8 +516,8 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
           onTap: () => _navigateTo(_SettingsView.subtitleSync),
         ),
 
-        // HDR Toggle (iOS, macOS, and Windows)
-        if (Platform.isIOS || Platform.isMacOS || Platform.isWindows)
+        // HDR Toggle (iOS, macOS, Windows, and Linux)
+        if (Platform.isIOS || Platform.isMacOS || Platform.isWindows || Platform.isLinux)
           _SettingsToggleItem(
             pref: SettingsService.enableHDR,
             icon: Symbols.hdr_strong_rounded,
@@ -689,7 +693,10 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
               trailing: isSelected ? AppIcon(Symbols.check_rounded, fill: 1, color: primary) : null,
               onTap: () async {
                 await widget.player.setRate(speed);
-                // Save as default playback speed
+                final meta = widget.playbackMetadata;
+                if (meta != null) {
+                  await PlaybackSpeedMemoryService.rememberSpeedFor(meta, speed);
+                }
                 await SettingsService.instance.write(SettingsService.defaultPlaybackSpeed, speed);
                 if (context.mounted) {
                   OverlaySheetController.of(context).close(); // Close sheet after selection

@@ -1,0 +1,20 @@
+name: emby_core
+description: Standalone Emby REST API client for Dart (auth, DTOs, repositories).
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+
+dependencies:
+  dio: ^5.9.2
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.11.0
+  uuid: ^4.5.3
+
+dev_dependencies:
+  build_runner: ^2.15.0
+  freezed: ^3.2.5
+  json_serializable: ^6.13.2
+  mocktail: ^1.0.4
+  test: ^1.25.0

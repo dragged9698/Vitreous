@@ -30,7 +30,24 @@ extension _PlexVideoControlsVisibilityMethods on _PlexVideoControlsState {
   void _listenToPlayingState() {
     _playingSubscription = widget.player.streams.playing.listen((isPlaying) {
       widget.chromeController.setPlaying(isPlaying);
+      unawaited(_applyAlwaysOnTopForPlayback(isPlaying));
     });
+  }
+
+  Future<void> _applyAlwaysOnTopForPlayback(bool isPlaying) async {
+    if (!PlatformDetector.isDesktopOS()) return;
+    final mode = _settings.read(SettingsService.alwaysOnTopMode);
+    if (mode == AlwaysOnTopMode.off) return;
+    if (mode == AlwaysOnTopMode.on && !isPlaying) return;
+
+    await DesktopPipService.applyMode(mode, isPlaying: isPlaying);
+    if (!mounted) return;
+    final isOnTop = Platform.isLinux
+        ? await LinuxWindowService.isKeepAbove()
+        : await windowManager.isAlwaysOnTop();
+    if (isOnTop != _isAlwaysOnTop) {
+      _setControlsState(() => _isAlwaysOnTop = isOnTop);
+    }
   }
 
   /// Listen to completed stream to show controls when video ends
@@ -189,7 +206,14 @@ extension _PlexVideoControlsVisibilityMethods on _PlexVideoControlsState {
 
   /// Initialize always-on-top state from window manager (desktop only)
   Future<void> _initAlwaysOnTopState() async {
-    final isOnTop = await windowManager.isAlwaysOnTop();
+    final mode = _settings.read(SettingsService.alwaysOnTopMode);
+    if (mode == AlwaysOnTopMode.whenPlaying) {
+      await _applyAlwaysOnTopForPlayback(widget.player.state.isActive);
+      return;
+    }
+    final isOnTop = Platform.isLinux
+        ? await LinuxWindowService.isKeepAbove()
+        : await windowManager.isAlwaysOnTop();
     if (mounted && isOnTop != _isAlwaysOnTop) {
       _setControlsState(() {
         _isAlwaysOnTop = isOnTop;
@@ -202,7 +226,12 @@ extension _PlexVideoControlsVisibilityMethods on _PlexVideoControlsState {
     if (!PlatformDetector.isDesktopOS()) return;
 
     final newValue = !_isAlwaysOnTop;
-    await windowManager.setAlwaysOnTop(newValue);
+    if (Platform.isLinux) {
+      await LinuxWindowService.setKeepAbove(newValue);
+    } else {
+      await windowManager.setAlwaysOnTop(newValue);
+    }
+    await _settings.write(SettingsService.alwaysOnTopMode, newValue ? AlwaysOnTopMode.on : AlwaysOnTopMode.off);
     if (!mounted) return;
     _setControlsState(() {
       _isAlwaysOnTop = newValue;

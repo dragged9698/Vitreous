@@ -122,34 +122,31 @@ class ConnectionRegistry {
     await _db.delete(_db.connections).go();
   }
 
-  /// All Plex accounts in insertion order. Convenience over
-  /// `(await list()).whereType<PlexAccountConnection>()` — cuts ~3 lines from
-  /// every caller that needs to filter by backend.
-  Future<List<PlexAccountConnection>> listPlexAccounts() async {
+  /// All Emby connections in insertion order.
+  Future<List<EmbyConnection>> listEmby() async {
     final all = await list();
-    return all.whereType<PlexAccountConnection>().toList();
+    return all.whereType<EmbyConnection>().toList();
   }
 
-  /// All Jellyfin connections in insertion order. Symmetric helper to
-  /// [listPlexAccounts].
   Future<List<JellyfinConnection>> listJellyfin() async {
     final all = await list();
     return all.whereType<JellyfinConnection>().toList();
   }
 
-  /// Lookup a [PlexAccountConnection] by id. Returns `null` if no row
-  /// matches OR the row exists but isn't a Plex account.
-  Future<PlexAccountConnection?> getPlexAccount(String id) async {
-    final c = await get(id);
-    return c is PlexAccountConnection ? c : null;
-  }
-
-  /// Lookup a [JellyfinConnection] by id. Returns `null` if no row matches
-  /// OR the row exists but isn't a Jellyfin connection.
   Future<JellyfinConnection?> getJellyfin(String id) async {
     final c = await get(id);
     return c is JellyfinConnection ? c : null;
   }
+
+  Future<EmbyConnection?> getEmby(String id) async {
+    final c = await get(id);
+    return c is EmbyConnection ? c : null;
+  }
+
+  /// Deprecated Plex stubs for compile compatibility during migration.
+  Future<List<PlexAccountConnection>> listPlexAccounts() async => [];
+
+  Future<PlexAccountConnection?> getPlexAccount(String id) async => null;
 
   Future<Connection?> _rowToConnection(ConnectionRow row) async {
     try {
@@ -161,7 +158,7 @@ class ConnectionRegistry {
           ? null
           : DateTime.fromMillisecondsSinceEpoch(row.lastAuthenticatedAt!);
       final connection = switch (kind) {
-        ConnectionKind.plex => PlexAccountConnection.fromConfigJson(
+        ConnectionKind.emby => EmbyConnection.fromConfigJson(
           id: row.id,
           json: revealed.config,
           status: ConnectionStatus.unknown,

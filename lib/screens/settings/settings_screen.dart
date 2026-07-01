@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:plezy/widgets/app_icon.dart';
+import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -339,6 +339,12 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
           title: t.settings.autoRemoveWatchedDownloads,
           subtitle: t.settings.autoRemoveWatchedDownloadsDescription,
         ),
+        SettingSwitchTile(
+          pref: settings.SettingsService.autoRemoveOrphanedDownloads,
+          icon: Symbols.cloud_off_rounded,
+          title: t.settings.autoRemoveOrphanedDownloads,
+          subtitle: t.settings.autoRemoveOrphanedDownloadsDescription,
+        ),
       ],
     );
   }
@@ -378,6 +384,15 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
       crossAxisAlignment: .start,
       children: [
         SettingsSectionHeader(t.settings.advanced),
+        ListTile(
+          leading: const AppIcon(Symbols.computer_rounded, fill: 1),
+          title: Text(t.settings.customDeviceName),
+          subtitle: Text(
+            _settingsService.read(settings.SettingsService.customDeviceName) ?? t.settings.customDeviceNameHint,
+          ),
+          trailing: const AppIcon(Symbols.chevron_right_rounded, fill: 1),
+          onTap: () => _showDeviceNameDialog(),
+        ),
         ListTile(
           focusNode: _focusTracker.get(_kWatchTogetherRelay),
           leading: const AppIcon(Symbols.dns_rounded, fill: 1),
@@ -644,6 +659,23 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
       setState(() {});
       showAppSnackBar(context, t.settings.downloadLocationReset);
     }
+  }
+
+  Future<void> _showDeviceNameDialog() async {
+    final current = _settingsService.read(settings.SettingsService.customDeviceName) ?? '';
+    final value = await showTextInputDialog(
+      context,
+      title: t.settings.customDeviceName,
+      labelText: t.settings.customDeviceName,
+      hintText: t.settings.customDeviceNameHint,
+      initialValue: current,
+    );
+    if (value == null) return;
+    final trimmed = value.trim();
+    await _settingsService.write(
+      settings.SettingsService.customDeviceName,
+      trimmed.isEmpty ? null : trimmed,
+    );
   }
 
   Future<void> _showRelayUrlDialog() async {

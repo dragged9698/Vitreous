@@ -12,8 +12,13 @@ class MediaLibrary {
   final String title;
 
   /// Primary media kind held by this library — drives default UI affordances
-  /// (poster shape, sort options). For mixed libraries this is [MediaKind.unknown].
+  /// (poster shape, sort options). For mixed libraries this is [MediaKind.mixed].
   final MediaKind kind;
+
+  /// Raw Emby/Jellyfin `CollectionType` from `/Users/{id}/Views` (e.g. `mixed`,
+  /// `tvshows`). Kept so browse grouping survives stale [kind] values until the
+  /// next library refresh.
+  final String? collectionType;
 
   /// Optional ISO language code of the library's metadata locale.
   final String? language;
@@ -37,6 +42,7 @@ class MediaLibrary {
     required this.backend,
     required this.title,
     this.kind = MediaKind.unknown,
+    this.collectionType,
     this.language,
     this.updatedAt,
     this.createdAt,
@@ -48,11 +54,37 @@ class MediaLibrary {
 
   String get globalKey => serverId != null ? buildGlobalKey(ServerId(serverId!), id) : id;
 
+  /// Kind used for library browse grouping and default `/Items` scoping.
+  /// [collectionType] wins when the server supplies it — stale [kind] values from
+  /// an older app build must not override a `mixed` library.
+  MediaKind get browseKind {
+    final fromCollection = _browseKindFromCollectionType(collectionType);
+    if (fromCollection != null) return fromCollection;
+    // Legacy mapper bug: views were tagged MediaKind.folder via Type=CollectionFolder.
+    if (kind == MediaKind.folder) return MediaKind.unknown;
+    if (kind != MediaKind.unknown) return kind;
+    return MediaKind.unknown;
+  }
+
+  static MediaKind? _browseKindFromCollectionType(String? raw) {
+    return switch (raw?.toLowerCase()) {
+      'mixed' => MediaKind.mixed,
+      'movies' => MediaKind.movie,
+      'tvshows' => MediaKind.show,
+      'music' => MediaKind.artist,
+      'musicvideos' => MediaKind.clip,
+      'homevideos' => MediaKind.clip,
+      'photos' => MediaKind.photo,
+      _ => null,
+    };
+  }
+
   MediaLibrary copyWith({
     String? id,
     MediaBackend? backend,
     String? title,
     MediaKind? kind,
+    String? collectionType,
     String? language,
     int? updatedAt,
     int? createdAt,
@@ -66,6 +98,7 @@ class MediaLibrary {
       backend: backend ?? this.backend,
       title: title ?? this.title,
       kind: kind ?? this.kind,
+      collectionType: collectionType ?? this.collectionType,
       language: language ?? this.language,
       updatedAt: updatedAt ?? this.updatedAt,
       createdAt: createdAt ?? this.createdAt,

@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/connection/connection.dart';
-import 'package:plezy/models/plex/plex_home_user.dart';
-import 'package:plezy/profiles/profile.dart';
-import 'package:plezy/profiles/profile_merge.dart';
-import 'package:plezy/services/storage_service.dart';
+import 'package:emby_player/connection/connection.dart';
+import 'package:emby_player/models/plex/plex_home_user.dart';
+import 'package:emby_player/profiles/profile.dart';
+import 'package:emby_player/profiles/profile_merge.dart';
+import 'package:emby_player/services/storage_service.dart';
 
 import '../test_helpers/prefs.dart';
 

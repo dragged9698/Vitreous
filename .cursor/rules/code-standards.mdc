@@ -1,0 +1,68 @@
+---
+description: Dart/Flutter code standards, formatters, and CI gates for Emby Player
+globs: "**/*.dart"
+alwaysApply: false
+---
+
+# Code Standards
+
+Global Dart rules: `~/.cursor/rules/language-dart-flutter.mdc` and `sdk-flutter-stack.mdc`. This file adds **project-specific** gates.
+
+## Formatting & analysis
+
+| Check | Command |
+|-------|---------|
+| Dart format | `dart format .` — **120 col** (`analysis_options.yaml`) |
+| Analyze | `flutter analyze` — warnings treated as errors (CI) |
+| Full CI | `scripts/ci_checks.sh` |
+| Codegen | `scripts/codegen.sh` |
+| Native | `scripts/format_native.sh --fix` |
+
+Run CI-equivalent checks before finishing substantive Dart edits.
+
+## Patterns to follow
+
+- **`abstract interface class`** for boundaries (`MediaDataSource`).
+- **`sealed class`** for closed hierarchies (`Connection`, `Profile`).
+- **`final class`** for adapters (`EmbyMediaDataSource`).
+- **`ChangeNotifier` + mixins** — `DisposableChangeNotifierMixin`, `MountedSetStateMixin` where repo uses them.
+- **Coalesce concurrent loads** — `_inFlightLoad` / shared future pattern in providers.
+- **`unawaited()`** for async in constructors; cancel/dispose listeners explicitly.
+- **Stable enum persistence ids** — use explicit `id` getters for Drift rows (see `OfflineActionType`).
+
+## Logging
+
+- `AppLogger` / `appLogger` only — `avoid_print` enforced.
+- Never log raw `Authorization`, passwords, or user tokens.
+
+## Testing
+
+```bash
+flutter test
+cd packages/emby_core && dart test
+# Live server (optional):
+EMBY_SERVER_URL=... EMBY_USERNAME=... EMBY_PASSWORD=... dart test test/integration/
+```
+
+- Unit tests in `packages/emby_core/test/unit/`.
+- Use `@visibleForTesting` constructors (`AppDatabase.forTesting`).
+
+## Naming
+
+| Layer | Convention |
+|-------|------------|
+| Files | `snake_case.dart` |
+| Classes | PascalCase |
+| Providers | `*Provider` suffix |
+| Services | `*Service` suffix |
+| Screens | `*_screen.dart` |
+
+## Context7
+
+Query Context7 for Flutter, Provider, Drift, Dio, or MPV-related packages when API is uncertain.
+
+## Forbidden
+
+- Editing `*.g.dart`, `*.freezed.dart`, `strings_*.g.dart`
+- Stale codegen (source newer than generated — CI fails)
+- `print()` / debug logging left in production paths

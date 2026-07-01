@@ -1,0 +1,83 @@
+---
+description: Emby Player app architecture — layers, modules, and data flow
+globs: "{lib,packages/emby_core}/**"
+alwaysApply: false
+---
+
+# Architecture
+
+## Repository layout
+
+```
+emby-player/
+├── lib/                      # Flutter app
+│   ├── main.dart             # MultiProvider boot
+│   ├── providers/            # UI state (ChangeNotifier)
+│   ├── services/             # IO, clients, platform, persistence helpers
+│   ├── screens/              # Route-level UI
+│   ├── widgets/              # Reusable UI (TV focus aware)
+│   ├── domain/               # Abstract interfaces (MediaDataSource)
+│   ├── data/                 # Adapters (EmbyMediaDataSource)
+│   ├── connection/           # Connection model + registry
+│   ├── profiles/             # Profile model + active profile
+│   ├── media/                # Domain types (MediaItem, libraries)
+│   ├── mpv/                  # Player abstraction + platform impls
+│   ├── database/             # Drift AppDatabase
+│   └── i18n/                 # slang JSON sources
+├── packages/emby_core/       # Standalone Emby REST SDK
+├── server/                   # Go watch-together relay
+├── website/                  # SvelteKit marketing/docs site
+└── scripts/                  # codegen, CI, release
+```
+
+## Layer rules (top → bottom)
+
+| Layer | May depend on | Must not |
+|-------|---------------|----------|
+| **Widgets / Screens** | Providers, widgets, i18n | HTTP, Drift directly (prefer services) |
+| **Providers** | Services, domain interfaces | Dio, raw SQL |
+| **Services / Clients** | emby_core, database, platform | Widget `BuildContext` |
+| **Domain** | media types only | Flutter, HTTP |
+| **emby_core** | dio, models | Flutter, app services |
+
+## Data flow (browse → play)
+
+```
+EmbyConnection (Drift)
+  → ConnectionRegistry / MultiServerManager
+  → EmbyClient (MediaServerClient)
+  → EmbyMediaDataSource (MediaDataSource)
+  → LibrariesProvider / screen
+  → PlaybackInitializationResult
+  → Player (MPV platform impl) via video_player screen
+```
+
+## Provider registration
+
+- Register app-wide providers in `main.dart` `MultiProvider`.
+- One canonical provider per domain (`LibrariesProvider`, `DownloadProvider`, …).
+- Profile-scoped rebinding via `ActiveProfileBinder` — do not duplicate fetch logic in screens.
+
+## Persistence
+
+- **Drift** (`AppDatabase`) — connections, profiles, downloads, API cache, offline watch sync.
+- **SharedPreferences** — settings via `SettingsService` / `BaseSharedPreferencesService`.
+- Bump `schemaVersion` + implement migration for schema changes.
+
+## Legacy Plezy surface
+
+Large Plezy/Jellyfin/Plex code paths remain for gradual removal. **New work:**
+
+- Target Emby API via `emby_core` or `EmbyClient`.
+- Do not extend Jellyfin/Plex-specific mappers unless explicitly asked.
+- `MediaBackend.fromString` defaults unknown IDs to emby with a warning.
+
+## Cross-package changes
+
+When changing Emby REST contracts:
+
+1. Update `packages/emby_core` models/repositories first.
+2. Adapt `lib/services/emby_client.dart` / mappers.
+3. Update providers/screens last.
+
+Run emby_core tests before app integration.

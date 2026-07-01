@@ -45,6 +45,10 @@ extension _VideoPlayerPlaybackServiceMethods on VideoPlayerScreenState {
     if (Platform.isWindows && _displayModeService != null) {
       await _applyWindowsDisplayMatching();
     }
+
+    if (Platform.isLinux) {
+      await _applyLinuxHdrMatching(settingsService);
+    }
   }
 
   Future<void> _wirePlayerStreams({

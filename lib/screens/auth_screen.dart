@@ -321,7 +321,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 mainAxisAlignment: .center,
                 mainAxisSize: .min,
                 children: [
-                  const BackendBadge(backend: MediaBackend.plex, size: 18),
+                  const BackendBadge(backend: MediaBackend.emby, size: 18),
                   const SizedBox(width: 8),
                   Text(t.auth.signInWithPlex),
                 ],
@@ -345,7 +345,7 @@ class _AuthScreenState extends State<AuthScreen> {
             child: ElevatedButton.icon(
               onPressed: busy ? null : startBrowser,
               style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-              icon: const BackendBadge(backend: MediaBackend.plex, size: 18),
+              icon: const BackendBadge(backend: MediaBackend.emby, size: 18),
               label: Text(t.auth.signInWithPlex),
             ),
           ),
@@ -381,7 +381,7 @@ class _AuthScreenState extends State<AuthScreen> {
           child: OutlinedButton.icon(
             onPressed: _connectToJellyfin,
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-            icon: const BackendBadge(backend: MediaBackend.jellyfin, size: 18),
+            icon: const BackendBadge(backend: MediaBackend.emby, size: 18),
             label: Text(t.auth.connectToJellyfin),
           ),
         ),

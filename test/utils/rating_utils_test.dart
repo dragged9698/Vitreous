@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/utils/rating_utils.dart';
+import 'package:emby_player/utils/rating_utils.dart';
 
 void main() {
   group('parseRatingImage - null/missing', () {

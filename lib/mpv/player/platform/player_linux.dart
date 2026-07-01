@@ -1,5 +1,25 @@
 import '../player_native.dart';
+import '../video_rect_support.dart';
 
-/// Uses libmpv with FlTextureGL — video rendered to an offscreen FBO
-/// and composited GPU-side via Flutter's Texture widget.
-class PlayerLinux extends PlayerNative {}
+/// Linux MPV player — Flutter texture (SDR tonemap) or native embed (HDR passthrough).
+class PlayerLinux extends PlayerNative with VideoRectSupport {
+  @override
+  int? get textureId => usesLinuxEmbed ? null : super.textureId;
+
+  @override
+  Future<void> setVideoRect({
+    required int left,
+    required int top,
+    required int right,
+    required int bottom,
+    required double devicePixelRatio,
+  }) async {
+    await invoke('setVideoRect', {
+      'left': left,
+      'top': top,
+      'right': right,
+      'bottom': bottom,
+      'devicePixelRatio': devicePixelRatio,
+    });
+  }
+}

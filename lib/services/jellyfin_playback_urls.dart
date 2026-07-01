@@ -8,9 +8,10 @@ String buildJellyfinDirectStreamUrl({
   String? playSessionId,
   String? liveStreamId,
   int? audioStreamIndex,
+  bool staticStream = true,
 }) {
   final params = <String, String>{
-    'Static': 'true',
+    if (staticStream) 'Static': 'true',
     'api_key': accessToken,
     'DeviceId': deviceId,
     'Container': ?container,

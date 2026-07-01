@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/ids.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/media/media_stream.dart';
-import 'package:plezy/services/jellyfin_mappers.dart';
-import 'package:plezy/services/settings_service.dart' show EpisodePosterMode;
+import 'package:emby_player/media/ids.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/media/media_library.dart';
+import 'package:emby_player/media/media_stream.dart';
+import 'package:emby_player/screens/libraries/library_browse_grouping.dart';
+import 'package:emby_player/services/jellyfin_mappers.dart';
+import 'package:emby_player/services/settings_service.dart' show EpisodePosterMode;
 
 const _serverId = 'jf-machine-1';
 
@@ -402,13 +404,59 @@ void main() {
       }
     });
 
-    test('falls back to MediaKind.unknown for unrecognised collections', () {
+    test('maps mixed CollectionType to MediaKind.mixed', () {
       final lib = JellyfinMappers.library({
         'Id': 'view-x',
         'Name': 'Mixed',
         'CollectionType': 'mixed',
       }, serverId: ServerId(_serverId))!;
+      expect(lib.kind, MediaKind.mixed);
+      expect(lib.collectionType, 'mixed');
+      expect(lib.browseKind, MediaKind.mixed);
+    });
+
+    test('browseKind falls back to collectionType when kind is unknown', () {
+      final lib = MediaLibrary(
+        id: 'view-x',
+        backend: MediaBackend.jellyfin,
+        title: 'Anime',
+        kind: MediaKind.unknown,
+        collectionType: 'mixed',
+        serverId: _serverId,
+      );
+      expect(lib.browseKind, MediaKind.mixed);
+      expect(
+        libraryBrowseGroupingOptions(lib, canGroupByFolders: true),
+        const [
+          browseGroupingAll,
+          browseGroupingShows,
+          browseGroupingMovies,
+          browseGroupingEpisodes,
+          browseGroupingFolders,
+        ],
+      );
+    });
+
+    test('browseKind prefers collectionType over stale kind', () {
+      final lib = MediaLibrary(
+        id: 'view-x',
+        backend: MediaBackend.jellyfin,
+        title: 'Anime',
+        kind: MediaKind.clip,
+        collectionType: 'mixed',
+        serverId: _serverId,
+      );
+      expect(lib.browseKind, MediaKind.mixed);
+    });
+
+    test('views without CollectionType are not mapped to folder kind', () {
+      final lib = JellyfinMappers.library({
+        'Id': 'view-anime',
+        'Name': 'Anime',
+        'Type': 'CollectionFolder',
+      }, serverId: ServerId(_serverId))!;
       expect(lib.kind, MediaKind.unknown);
+      expect(lib.browseKind, MediaKind.unknown);
     });
   });
 

@@ -6,11 +6,9 @@ import 'package:drift/drift.dart';
 import '../media/media_backend.dart';
 import '../media/media_source_info.dart';
 import '../utils/app_logger.dart';
-import '../utils/plex_cache_parser.dart';
 import 'api_cache.dart';
-import 'jellyfin_api_cache.dart';
-import 'jellyfin_media_info_mapper.dart';
-import 'plex_mappers.dart';
+import 'emby_api_cache.dart';
+import 'emby_media_info_mapper.dart';
 
 class CachedPlaybackMetadataService {
   const CachedPlaybackMetadataService._();
@@ -21,11 +19,9 @@ class CachedPlaybackMetadataService {
     required String itemId,
     int mediaIndex = 0,
   }) async {
+    if (backend != MediaBackend.emby) return null;
     try {
-      return switch (backend) {
-        MediaBackend.plex => _fetchPlexMediaSourceInfo(ServerId(cacheServerId), itemId, mediaIndex: mediaIndex),
-        MediaBackend.jellyfin => _fetchJellyfinMediaSourceInfo(cacheServerId, itemId, mediaIndex: mediaIndex),
-      };
+      return _fetchEmbyMediaSourceInfo(cacheServerId, itemId, mediaIndex: mediaIndex);
     } catch (e) {
       appLogger.d('Cached media source info unavailable for $cacheServerId:$itemId', error: e);
       return null;
@@ -40,83 +36,44 @@ class CachedPlaybackMetadataService {
     String? creditsPattern,
     bool forceChapterFallback = false,
   }) async {
+    if (backend != MediaBackend.emby) return null;
     try {
-      return switch (backend) {
-        MediaBackend.plex => _fetchPlexPlaybackExtras(
-          ServerId(cacheServerId),
-          itemId,
-          introPattern: introPattern,
-          creditsPattern: creditsPattern,
-          forceChapterFallback: forceChapterFallback,
-        ),
-        MediaBackend.jellyfin => _fetchJellyfinPlaybackExtras(
-          cacheServerId,
-          itemId,
-          introPattern: introPattern,
-          creditsPattern: creditsPattern,
-          forceChapterFallback: forceChapterFallback,
-        ),
-      };
+      return _fetchEmbyPlaybackExtras(
+        cacheServerId,
+        itemId,
+        introPattern: introPattern,
+        creditsPattern: creditsPattern,
+        forceChapterFallback: forceChapterFallback,
+      );
     } catch (e) {
       appLogger.d('Cached playback extras unavailable for $cacheServerId:$itemId', error: e);
       return null;
     }
   }
 
-  static Future<MediaSourceInfo?> _fetchPlexMediaSourceInfo(
-    ServerId serverId,
-    String itemId, {
-    required int mediaIndex,
-  }) async {
-    final metadata = await _plexMetadata(ServerId(serverId), itemId);
-    return metadata == null ? null : plexMediaSourceInfoFromCacheJson(metadata, mediaIndex: mediaIndex);
-  }
-
-  static Future<PlaybackExtras?> _fetchPlexPlaybackExtras(
-    ServerId serverId,
-    String itemId, {
-    String? introPattern,
-    String? creditsPattern,
-    bool forceChapterFallback = false,
-  }) async {
-    final metadata = await _plexMetadata(ServerId(serverId), itemId);
-    if (metadata == null) return null;
-    return plexPlaybackExtrasFromCacheJson(
-      metadata,
-      introPattern: introPattern,
-      creditsPattern: creditsPattern,
-      forceChapterFallback: forceChapterFallback,
-    );
-  }
-
-  static Future<Map<String, dynamic>?> _plexMetadata(ServerId serverId, String itemId) async {
-    final cached = await ApiCache.forBackend(MediaBackend.plex).get(serverId, '/library/metadata/$itemId');
-    return PlexCacheParser.extractFirstMetadata(cached);
-  }
-
-  static Future<MediaSourceInfo?> _fetchJellyfinMediaSourceInfo(
+  static Future<MediaSourceInfo?> _fetchEmbyMediaSourceInfo(
     String cacheServerId,
     String itemId, {
     required int mediaIndex,
   }) async {
-    final raw = await _jellyfinRawItem(cacheServerId, itemId);
+    final raw = await _embyRawItem(cacheServerId, itemId);
     final sources = raw['MediaSources'];
     if (sources is! List || sources.isEmpty) return null;
     final selected = mediaIndex >= 0 && mediaIndex < sources.length ? sources[mediaIndex] : sources.first;
     if (selected is! Map<String, dynamic>) return null;
-    return jellyfinMediaSourceToMediaSourceInfo(selected, chapters: raw['Chapters'], trickplay: raw['Trickplay']);
+    return embyMediaSourceToMediaSourceInfo(selected, chapters: raw['Chapters'], trickplay: raw['Trickplay']);
   }
 
-  static Future<PlaybackExtras?> _fetchJellyfinPlaybackExtras(
+  static Future<PlaybackExtras?> _fetchEmbyPlaybackExtras(
     String cacheServerId,
     String itemId, {
     String? introPattern,
     String? creditsPattern,
     bool forceChapterFallback = false,
   }) async {
-    final raw = await _jellyfinRawItem(cacheServerId, itemId);
-    final markers = await _jellyfinMediaSegmentMarkers(cacheServerId, itemId);
-    return jellyfinPlaybackExtrasFromRaw(
+    final raw = await _embyRawItem(cacheServerId, itemId);
+    final markers = await _embyMediaSegmentMarkers(cacheServerId, itemId);
+    return embyPlaybackExtrasFromRaw(
       raw,
       itemId,
       introPattern: introPattern,
@@ -126,20 +83,20 @@ class CachedPlaybackMetadataService {
     );
   }
 
-  static Future<List<MediaMarker>> _jellyfinMediaSegmentMarkers(String cacheServerId, String itemId) async {
+  static Future<List<MediaMarker>> _embyMediaSegmentMarkers(String cacheServerId, String itemId) async {
     try {
       final raw = await ApiCache.forBackend(
-        MediaBackend.jellyfin,
-      ).get(ServerId(cacheServerId), JellyfinApiCache.mediaSegmentsEndpoint(itemId));
-      return jellyfinMediaSegmentsToMarkers(raw);
+        MediaBackend.emby,
+      ).get(ServerId(cacheServerId), EmbyApiCache.mediaSegmentsEndpoint(itemId));
+      return embyMediaSegmentsToMarkers(raw);
     } catch (e) {
-      appLogger.d('Cached Jellyfin media segments unavailable for $cacheServerId:$itemId', error: e);
+      appLogger.d('Cached Emby media segments unavailable for $cacheServerId:$itemId', error: e);
       return const [];
     }
   }
 
-  static Future<Map<String, dynamic>> _jellyfinRawItem(String cacheServerId, String itemId) async {
-    final cache = ApiCache.forBackend(MediaBackend.jellyfin);
+  static Future<Map<String, dynamic>> _embyRawItem(String cacheServerId, String itemId) async {
+    final cache = ApiCache.forBackend(MediaBackend.emby);
     final scopedPrefix = cacheServerId.contains('/') ? null : '$cacheServerId/%:/Users/%/Items/$itemId';
     final rows =
         await (cache.database.select(cache.database.apiCache)..where(
@@ -148,7 +105,7 @@ class CachedPlaybackMetadataService {
                   (scopedPrefix == null ? const Constant(false) : t.cacheKey.like(scopedPrefix)),
             ))
             .get();
-    if (rows.isEmpty) throw StateError('No Jellyfin cache row for $cacheServerId:$itemId');
+    if (rows.isEmpty) throw StateError('No Emby cache row for $cacheServerId:$itemId');
     return jsonDecode(rows.first.data) as Map<String, dynamic>;
   }
 }

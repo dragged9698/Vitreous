@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/services/trackers/tracker_constants.dart';
-import 'package:plezy/services/trackers/tracker_exceptions.dart';
-import 'package:plezy/services/trackers/tracker_session.dart';
-import 'package:plezy/services/trackers/tracker_session_utils.dart';
+import 'package:emby_player/services/trackers/tracker_constants.dart';
+import 'package:emby_player/services/trackers/tracker_exceptions.dart';
+import 'package:emby_player/services/trackers/tracker_session.dart';
+import 'package:emby_player/services/trackers/tracker_session_utils.dart';
 
 void main() {
   group('tracker token expiry helpers', () {

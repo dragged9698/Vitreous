@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/utils/orientation_helper.dart';
+import 'package:emby_player/utils/orientation_helper.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

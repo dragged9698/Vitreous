@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/watch_together/models/playback_state.dart';
-import 'package:plezy/watch_together/models/sync_message.dart';
-import 'package:plezy/watch_together/models/watch_session.dart';
+import 'package:emby_player/watch_together/models/playback_state.dart';
+import 'package:emby_player/watch_together/models/sync_message.dart';
+import 'package:emby_player/watch_together/models/watch_session.dart';
 
 void main() {
   const fullState = PlaybackState(

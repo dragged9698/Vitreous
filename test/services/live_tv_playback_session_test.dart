@@ -4,14 +4,14 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:plezy/connection/connection.dart';
-import 'package:plezy/database/app_database.dart';
-import 'package:plezy/exceptions/media_server_exceptions.dart';
-import 'package:plezy/media/ids.dart';
-import 'package:plezy/models/plex/plex_config.dart';
-import 'package:plezy/services/jellyfin_client.dart';
-import 'package:plezy/services/plex_api_cache.dart';
-import 'package:plezy/services/plex_client.dart';
+import 'package:emby_player/connection/connection.dart';
+import 'package:emby_player/database/app_database.dart';
+import 'package:emby_player/exceptions/media_server_exceptions.dart';
+import 'package:emby_player/media/ids.dart';
+import 'package:emby_player/models/plex/plex_config.dart';
+import 'package:emby_player/services/jellyfin_client.dart';
+import 'package:emby_player/services/plex_api_cache.dart';
+import 'package:emby_player/services/plex_client.dart';
 
 /// Pins the [LiveTvPlaybackSession] lifecycle on both backends — the
 /// per-backend protocol that used to be hand-rolled (3×) inside the player's

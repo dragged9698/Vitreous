@@ -1,15 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_item.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/media/media_server_client.dart';
-import 'package:plezy/models/trackers/anime_lists_mapping.dart';
-import 'package:plezy/models/trackers/fribb_mapping_row.dart';
-import 'package:plezy/services/trackers/anime_episode_progress_resolver.dart';
-import 'package:plezy/services/trackers/anime_lists_mapping_store.dart';
-import 'package:plezy/services/trackers/fribb_mapping_store.dart';
-import 'package:plezy/services/trackers/tracker_id_resolver.dart';
-import 'package:plezy/utils/external_ids.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_item.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/media/media_server_client.dart';
+import 'package:emby_player/models/trackers/anime_lists_mapping.dart';
+import 'package:emby_player/models/trackers/fribb_mapping_row.dart';
+import 'package:emby_player/services/trackers/anime_episode_progress_resolver.dart';
+import 'package:emby_player/services/trackers/anime_lists_mapping_store.dart';
+import 'package:emby_player/services/trackers/fribb_mapping_store.dart';
+import 'package:emby_player/services/trackers/tracker_id_resolver.dart';
+import 'package:emby_player/utils/external_ids.dart';
 
 class _FakeMediaServerClient implements MediaServerClient {
   final Map<String, ExternalIds> externalIdsByItem;

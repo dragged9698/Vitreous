@@ -1,0 +1,44 @@
+---
+description: Connections, profiles, multi-server, and auth persistence
+globs: "lib/{connection,profiles,services/emby*,services/multi_server*}/**"
+alwaysApply: false
+---
+
+# Connections & Profiles
+
+## Connection model
+
+- **`EmbyConnection`** — sealed `Connection` subtype; persisted in Drift `Connections` table.
+- **`ConnectionRegistry`** — CRUD + upsert; exposed via `Provider` from `main.dart`.
+- **`ConnectionKind.emby`** only for new connections; jellyfin ID aliases map to emby.
+
+## Profile model
+
+- **`Profile.local`** — Plezy profile with optional PIN (`pinHash` only — never raw PIN).
+- **`Profile.plexHome`** — legacy Plex Home surface; PIN handled server-side.
+- **`ProfileConnection`** join — per-profile user token per connection.
+- **`ActiveProfileProvider`** — current profile; rebinding triggers connection/library refresh.
+
+## Multi-server
+
+- **`MultiServerManager`** — binds online servers; notifies providers on reconnect waves.
+- Providers listen for online-server changes (`LibrariesProvider.syncToOnlineServers`).
+- Coalesce library fetches — track per-server success vs empty library.
+
+## Auth
+
+- **`EmbyAuthService`** / emby_core `AuthRepository` — authenticate, refresh context.
+- Tokens live in Drift/profile join rows — not logged, not in SharedPreferences plaintext unless existing pattern requires.
+- **`ConnectionStatus`** — `online`, `offline`, `authError`, `disabled`; UI shows `AuthErrorBanner`.
+
+## Bootstrap
+
+- `connection_bootstrap.dart` — startup connection restore order.
+- `ActiveProfileBinder` — wires profile switch → navigation + provider invalidation.
+
+## Forbidden
+
+- Storing raw 4-digit PINs in Drift or logs
+- Per-screen `ConnectionRegistry()` instantiation — use context `read<ConnectionRegistry>()`
+- Fetching libraries independently in sidebar AND screen without shared provider
+- Adding non-Emby connection kinds without master ruleset update

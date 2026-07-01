@@ -175,6 +175,9 @@ class DiscoverProvider extends ChangeNotifier with DisposableChangeNotifierMixin
     try {
       if (!_multiServer.hasConnectedServers) {
         if (isProfileBinding()) return;
+        // Auth-errored servers are offline by design — the session-expired
+        // banner handles that case; don't flash a misleading discover error.
+        if (_multiServer.hasAuthErrorServers) return;
         throw Exception('No servers available');
       }
 

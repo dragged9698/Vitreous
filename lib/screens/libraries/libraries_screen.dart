@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:plezy/widgets/app_icon.dart';
+import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -611,7 +611,7 @@ class _LibrariesScreenState extends State<LibrariesScreen>
     // [getPlexClientForLibrary] from falling back through `_resolveClient` to
     // the first online Plex server and firing the action against the wrong
     // backend.
-    if (library.backend != MediaBackend.plex) return [refresh];
+    if (library.backend != MediaBackend.emby) return [refresh];
     return [
       ContextMenuItem(
         value: 'scan',

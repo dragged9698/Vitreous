@@ -35,7 +35,7 @@ class PlexApiCache extends ApiCache {
   /// `ApiCache.forBackend(MediaBackend.plex)` resolve here.
   static void initialize(AppDatabase db) {
     _instance = PlexApiCache._(db);
-    ApiCache.registerInstance(MediaBackend.plex, _instance!);
+    ApiCache.registerInstance(MediaBackend.emby, _instance!);
   }
 
   /// Delete cached data for a specific item (when removing a download).

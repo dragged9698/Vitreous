@@ -5,6 +5,7 @@ import '../mpv/mpv.dart';
 import '../media/media_item.dart';
 import '../media/media_server_user_profile.dart';
 import '../media/media_source_info.dart';
+import '../services/playback_speed_memory_service.dart';
 import '../services/settings_service.dart';
 import '../services/track_selection_service.dart';
 import '../utils/app_logger.dart';
@@ -224,7 +225,9 @@ class TrackManager {
         preferredAudioTrack: preferredAudioTrack,
         preferredSubtitleTrack: preferredSubtitleTrack,
         preferredSecondarySubtitleTrack: preferredSecondarySubtitleTrack,
-        defaultPlaybackSpeed: settingsService.read(SettingsService.defaultPlaybackSpeed),
+        defaultPlaybackSpeed:
+            PlaybackSpeedMemoryService.rememberedSpeedFor(metadata) ??
+            settingsService.read(SettingsService.defaultPlaybackSpeed),
         onAudioTrackChanged: onAudioTrackChanged,
         onSubtitleTrackChanged: onSubtitleTrackChanged,
       );

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:plezy/widgets/app_icon.dart';
+import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
@@ -184,7 +184,7 @@ class _AddPlexAccountScreenState extends State<AddPlexAccountScreen> with AsyncF
                             onPressed: busy || this.busy ? null : browser,
                             child: FilledButton.icon(
                               onPressed: busy || this.busy ? null : browser,
-                              icon: const BackendBadge(backend: MediaBackend.plex, size: 18),
+                              icon: const BackendBadge(backend: MediaBackend.emby, size: 18),
                               label: Text(t.auth.signInWithPlex),
                             ),
                           ),

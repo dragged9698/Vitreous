@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/utils/layout_constants.dart';
+import 'package:emby_player/utils/layout_constants.dart';
 
 void main() {
   group('ScreenBreakpoints boundaries', () {

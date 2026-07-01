@@ -1,7 +1,7 @@
 import 'connection.dart';
 
 /// Backend-neutral auth service interface. Each backend's implementation
-/// (`PlexConnectionAuthService`, `JellyfinConnectionAuthService`) drives its
+/// (`PlexConnectionAuthService`, `EmbyConnectionAuthService`) drives its
 /// own UX (PIN flow vs. password) but produces the same opaque
 /// [Connection] record at the end.
 abstract class ConnectionAuthService {

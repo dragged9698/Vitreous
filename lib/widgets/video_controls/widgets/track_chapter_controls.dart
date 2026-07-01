@@ -234,6 +234,7 @@ class TrackChapterControls extends StatelessWidget {
                           onCancelAutoHide: onCancelAutoHide,
                           onStartAutoHide: onStartAutoHide,
                           onSyncOffsetChanged: onSyncOffsetChanged,
+                          playbackMetadata: trackControlsState.playbackMetadata,
                         ),
                       )
                       .whenComplete(() {

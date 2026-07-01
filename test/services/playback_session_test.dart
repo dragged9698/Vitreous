@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_item.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/media/media_version.dart';
-import 'package:plezy/models/transcode_quality_preset.dart';
-import 'package:plezy/services/playback_context.dart';
-import 'package:plezy/services/playback_initialization_types.dart';
-import 'package:plezy/services/playback_session.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_item.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/media/media_version.dart';
+import 'package:emby_player/models/transcode_quality_preset.dart';
+import 'package:emby_player/services/playback_context.dart';
+import 'package:emby_player/services/playback_initialization_types.dart';
+import 'package:emby_player/services/playback_session.dart';
 
 PlaybackContext _context(PlaybackInitializationResult result) {
   return PlaybackContext(

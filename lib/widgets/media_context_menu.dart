@@ -2,7 +2,7 @@ import 'dart:async';
 import '../media/ids.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:plezy/widgets/app_icon.dart';
+import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
@@ -72,7 +72,7 @@ bool isAdminActionAllowedForMediaItem({
   required Profile? activeProfile,
 }) {
   final blockedByPlexHomeRole =
-      itemBackend == MediaBackend.plex && activeProfile != null && activeProfile.isPlexHome && !activeProfile.plexAdmin;
+      itemBackend == MediaBackend.emby && activeProfile != null && activeProfile.isPlexHome && !activeProfile.plexAdmin;
   return isOwnerOrAdmin && !blockedByPlexHomeRole;
 }
 
@@ -206,7 +206,7 @@ class MediaContextMenuState extends State<MediaContextMenu> {
     // dispatching a Plex-only action against an unknown-backend item could
     // crash or hit the wrong server.
     final itemBackend = mediaItem?.backend ?? playlist?.backend;
-    final isPlex = itemBackend == MediaBackend.plex;
+    final isPlex = itemBackend == MediaBackend.emby;
 
     final isPartiallyWatched = mediaItem?.isPartiallyWatched ?? false;
 
@@ -395,7 +395,7 @@ class MediaContextMenuState extends State<MediaContextMenu> {
       }
 
       // File Info (for episodes and movies). Backend-neutral — both
-      // PlexClient and JellyfinClient implement [getFileInfo], reading
+      // PlexClient and EmbyClient implement [getFileInfo], reading
       // codec/stream metadata from `Media`/`MediaSources` respectively.
       // Hidden when the item has no backend marker so we don't fan out
       // to an arbitrary client.

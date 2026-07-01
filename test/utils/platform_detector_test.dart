@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/utils/platform_detector.dart';
+import 'package:emby_player/utils/platform_detector.dart';
 
 void main() {
   group('detectAndroidTvFromSystemFeatures', () {

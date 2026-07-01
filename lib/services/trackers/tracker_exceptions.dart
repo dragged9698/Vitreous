@@ -7,6 +7,9 @@ class TrackerApiException implements Exception {
 
   const TrackerApiException({required this.service, required this.statusCode, required this.body});
 
+  /// Trakt returns HTTP 423 when the user's collection exceeds 100k items.
+  bool get isAccountLocked => statusCode == 423;
+
   @override
   String toString() => 'TrackerApiException(${service.name}, HTTP $statusCode): $body';
 }

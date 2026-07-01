@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Emby Player
+Comment=High-performance Emby client for Linux
+Exec=emby_player
+Icon=plezy
+Terminal=false
+Categories=AudioVideo;Video;Player;
+Keywords=emby;media;streaming;video;
+StartupWMClass=emby_player

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../i18n/strings.g.dart';
+import '../../models/always_on_top_mode.dart';
 import '../../models/transcode_quality_preset.dart';
 import '../../mpv/player/platform/player_android.dart';
 import '../../utils/quality_preset_labels.dart';
@@ -56,7 +57,9 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
         if (PlatformDetector.supportsPictureInPicture()) _autoPipTile(),
         if (Platform.isAndroid) _matchContentFrameRateTile(),
         if (Platform.isWindows) _matchRefreshRateTile(),
-        if (Platform.isWindows) _matchDynamicRangeTile(),
+        if (Platform.isWindows || Platform.isLinux) _matchDynamicRangeTile(),
+        if (Platform.isLinux) _linuxHdrPassthroughTile(),
+        if (Platform.isWindows || Platform.isLinux) _hdrEnabledTile(),
         _displaySwitchDelayTile(),
         _tunneledPlaybackTile(),
         if (PlatformDetector.supportsAudioPassthrough()) _audioPassthroughTile(),
@@ -149,6 +152,58 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
           icon: Symbols.bookmark_rounded,
           title: t.settings.rememberTrackSelections,
           subtitle: t.settings.rememberTrackSelectionsDescription,
+        ),
+        SettingSwitchTile(
+          pref: SettingsService.rememberPlaybackSpeedPerShow,
+          icon: Symbols.speed_rounded,
+          title: t.settings.rememberPlaybackSpeedPerShow,
+          subtitle: t.settings.rememberPlaybackSpeedPerShowDescription,
+        ),
+        if (PlatformDetector.isDesktopOS())
+          SettingSelectionTile<AlwaysOnTopMode, AlwaysOnTopMode>(
+            pref: SettingsService.alwaysOnTopMode,
+            icon: Symbols.picture_in_picture_alt_rounded,
+            title: t.settings.alwaysOnTopMode,
+            subtitleBuilder: (v) => switch (v) {
+              AlwaysOnTopMode.off => t.settings.alwaysOnTopOff,
+              AlwaysOnTopMode.on => t.settings.alwaysOnTopOn,
+              AlwaysOnTopMode.whenPlaying => t.settings.alwaysOnTopWhenPlaying,
+            },
+            options: [
+              DialogOption(value: AlwaysOnTopMode.off, title: t.settings.alwaysOnTopOff),
+              DialogOption(value: AlwaysOnTopMode.on, title: t.settings.alwaysOnTopOn),
+              DialogOption(value: AlwaysOnTopMode.whenPlaying, title: t.settings.alwaysOnTopWhenPlaying),
+            ],
+            decode: (v) => v,
+            encode: (v) => v,
+          ),
+        if (Platform.isLinux || Platform.isWindows) ...[
+          SettingNumberTile(
+            pref: SettingsService.desktopPipWidth,
+            icon: Symbols.aspect_ratio_rounded,
+            title: t.settings.desktopPipWidth,
+            subtitleBuilder: (v) => '$v px',
+            labelText: t.settings.desktopPipWidth,
+            suffixText: 'px',
+            min: 320,
+            max: 3840,
+          ),
+          SettingNumberTile(
+            pref: SettingsService.desktopPipHeight,
+            icon: Symbols.aspect_ratio_rounded,
+            title: t.settings.desktopPipHeight,
+            subtitleBuilder: (v) => '$v px',
+            labelText: t.settings.desktopPipHeight,
+            suffixText: 'px',
+            min: 180,
+            max: 2160,
+          ),
+        ],
+        SettingSwitchTile(
+          pref: SettingsService.mpvLoadUserScripts,
+          icon: Symbols.code_rounded,
+          title: t.settings.mpvLoadUserScripts,
+          subtitle: t.settings.mpvLoadUserScriptsDescription,
         ),
         SettingSwitchTile(
           pref: SettingsService.showChapterMarkersOnTimeline,
@@ -276,6 +331,20 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
     subtitle: t.settings.matchDynamicRangeDescription,
   );
 
+  Widget _hdrEnabledTile() => SettingSwitchTile(
+    pref: SettingsService.enableHDR,
+    icon: Symbols.hdr_strong_rounded,
+    title: t.videoSettings.hdr,
+    subtitle: Platform.isLinux ? t.settings.linuxHdrTonemapDescription : t.settings.matchDynamicRangeDescription,
+  );
+
+  Widget _linuxHdrPassthroughTile() => SettingSwitchTile(
+    pref: SettingsService.linuxHdrPassthrough,
+    icon: Symbols.hdr_auto_rounded,
+    title: t.settings.linuxHdrPassthrough,
+    subtitle: t.settings.linuxHdrPassthroughDescription,
+  );
+
   Widget _audioPassthroughTile() => SettingSwitchTile(
     pref: SettingsService.audioPassthrough,
     icon: Symbols.surround_sound_rounded,
@@ -295,6 +364,8 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
           PlatformDetector.isAppleTV() ||
           (Platform.isWindows &&
               (svc.read(SettingsService.matchRefreshRate) || svc.read(SettingsService.matchDynamicRange))) ||
+          (Platform.isLinux &&
+              (svc.read(SettingsService.matchDynamicRange) || svc.read(SettingsService.linuxHdrPassthrough))) ||
           (Platform.isAndroid && svc.read(SettingsService.matchContentFrameRate));
       if (!shouldShow) return const SizedBox.shrink();
       return SettingNumberTile(

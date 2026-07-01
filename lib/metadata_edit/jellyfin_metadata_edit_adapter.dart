@@ -3,17 +3,17 @@ import '../media/media_backend.dart';
 import '../media/media_item.dart';
 import '../media/media_kind.dart';
 import '../media/media_server_client.dart';
-import '../services/jellyfin_client.dart';
-import '../utils/jellyfin_time.dart';
+import '../services/emby_client.dart';
+import '../utils/emby_time.dart';
 import 'metadata_edit_models.dart';
 
 class JellyfinMetadataEditAdapter extends MetadataEditAdapter {
-  final JellyfinClient client;
+  final EmbyClient client;
 
   JellyfinMetadataEditAdapter(this.client);
 
   @override
-  MediaBackend get backend => MediaBackend.jellyfin;
+  MediaBackend get backend => MediaBackend.emby;
 
   @override
   MediaServerClient get mediaClient => client;

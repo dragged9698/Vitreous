@@ -216,7 +216,7 @@ class PlatformDetector {
   }
 
   static bool supportsPictureInPicture() {
-    return !isAppleTV() && !isTV() && (Platform.isAndroid || Platform.isIOS || Platform.isMacOS);
+    return !isAppleTV() && !isTV() && (Platform.isAndroid || Platform.isIOS || Platform.isMacOS || Platform.isLinux || Platform.isWindows);
   }
 
   /// Detects if the device is likely a tablet based on screen size

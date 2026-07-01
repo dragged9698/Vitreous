@@ -52,6 +52,8 @@ import '../utils/track_label_builder.dart';
 import '../exceptions/media_server_exceptions.dart';
 import '../i18n/strings.g.dart';
 import '../utils/jellyfin_time.dart';
+import '../utils/json_utils.dart';
+import 'device_name_service.dart';
 import 'jellyfin_auth_header.dart';
 import '../media/download_resolution.dart';
 import 'api_cache.dart';
@@ -61,6 +63,8 @@ import 'jellyfin_mappers.dart';
 import 'jellyfin_media_info_mapper.dart';
 import 'jellyfin_playback_bundle.dart';
 import 'jellyfin_playback_urls.dart';
+import 'emby_playback_policy.dart';
+import 'emby_playback_urls.dart';
 import 'jellyfin_trickplay_service.dart';
 import 'playback_initialization_types.dart';
 import 'scrub_preview_source.dart';
@@ -125,10 +129,11 @@ class JellyfinClient
     } catch (_) {
       // Tests / non-platform contexts — keep the fallback version.
     }
+    final deviceName = await DeviceNameService.resolve();
     final authHeader = buildJellyfinAuthHeader(
       clientName: 'Plezy',
       clientVersion: version,
-      deviceName: 'Plezy',
+      deviceName: deviceName,
       deviceId: connection.deviceId,
       accessToken: connection.accessToken,
     );

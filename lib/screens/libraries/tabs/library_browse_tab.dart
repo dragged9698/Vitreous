@@ -8,6 +8,7 @@ import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../media/library_first_character.dart';
 import '../../../media/library_query.dart';
 import '../../../media/media_backend.dart';
+import '../../../media/media_kind.dart';
 import '../../../media/media_item.dart';
 import '../../../providers/multi_server_provider.dart';
 import '../../../utils/media_server_http_client.dart';
@@ -303,8 +304,21 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
         oldWidget.library.id != widget.library.id ||
         oldWidget.library.backend != widget.library.backend ||
         oldWidget.library.serverId != widget.library.serverId ||
-        oldWidget.library.isShared != widget.library.isShared) {
+        oldWidget.library.isShared != widget.library.isShared ||
+        oldWidget.library.kind != widget.library.kind ||
+        oldWidget.library.collectionType != widget.library.collectionType) {
       _alphaStrategy = _createAlphaStrategy();
+      final normalized = _normalizeGrouping(_selectedGrouping);
+      final groupingChanged = normalized != _selectedGrouping;
+      _selectedGrouping = normalized;
+      if (groupingChanged ||
+          oldWidget.library.kind != widget.library.kind ||
+          oldWidget.library.collectionType != widget.library.collectionType) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          unawaited(_loadContent());
+        });
+      }
     }
     super.didUpdateWidget(oldWidget);
     if (oldWidget.canGroupByFolders != widget.canGroupByFolders) {
@@ -320,8 +334,29 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
     }
   }
 
-  bool get _isJellyfinLibrary => widget.library.backend == MediaBackend.jellyfin;
+  bool get _isJellyfinLibrary => widget.library.backend == MediaBackend.emby;
   int get _activeFetchSize => _isJellyfinLibrary ? _jellyfinFetchSize : _fetchSize;
+
+  bool get _supportsBrowseFilters {
+    return switch (widget.library.browseKind) {
+      MediaKind.mixed || MediaKind.unknown || MediaKind.movie || MediaKind.show => true,
+      _ => false,
+    };
+  }
+
+  bool get _showMediaKindBadge =>
+      _selectedGrouping == browseGroupingAll &&
+      (widget.library.browseKind == MediaKind.mixed || widget.library.browseKind == MediaKind.unknown);
+
+  List<MediaFilter> _embyBootstrapFilters() => [
+    MediaFilter(
+      filter: 'unwatched',
+      filterType: 'boolean',
+      key: 'emby:unwatched',
+      title: t.libraries.filterCategories.unwatched,
+      type: 'filter',
+    ),
+  ];
 
   // Focus nodes for filter chips
   final FocusNode _groupingChipFocusNode = FocusNode(debugLabel: 'grouping_chip');
@@ -533,10 +568,11 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
       final LoadedFiltersAndSorts loaded;
       if (_isJellyfinLibrary) {
         // `/Items/Filters` can be much slower than the paged `/Items` browse
-        // request on large Jellyfin libraries. Load only the local sort list
-        // before page 1, then fill filter values in the background.
-        final sorts = await client.fetchSortOptions(widget.library.id, libraryType: widget.library.kind.id);
-        loaded = LoadedFiltersAndSorts(filters: const [], sorts: sorts);
+        // request on large libraries. Load only the local sort list plus the
+        // always-available unwatched toggle before page 1, then fill genre/year
+        // values in the background.
+        final sorts = await client.fetchSortOptions(widget.library.id, libraryType: widget.library.browseKind.id);
+        loaded = LoadedFiltersAndSorts(filters: _embyBootstrapFilters(), sorts: sorts);
       } else {
         // Plex filters+sorts must resolve before items so saved-sort restoration
         // can match a saved key against the just-loaded sort list, and so the
@@ -587,7 +623,7 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
     final client = context.getMediaClientForLibrary(widget.library);
     unawaited(
       client
-          .fetchLibraryFiltersWithValues(widget.library.id)
+          .fetchLibraryFiltersWithValues(widget.library.id, libraryKind: widget.library.browseKind)
           .then((result) {
             if (generation != _contentRequestId || !mounted) return;
             setState(() {
@@ -596,7 +632,7 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
             });
           })
           .catchError((Object e, StackTrace st) {
-            appLogger.w('Jellyfin library filters failed; browse content remains available', error: e, stackTrace: st);
+            appLogger.w('Library filters failed; browse content remains available', error: e, stackTrace: st);
           }),
     );
   }
@@ -701,14 +737,14 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
     final filterParams = _buildFilterParams();
     final query = libraryQueryFromPlexMap(
       map: filterParams,
-      libraryKind: filterParams.containsKey('type') ? null : widget.library.kind,
+      libraryKind: filterParams.containsKey('type') ? null : widget.library.browseKind,
       offset: start,
       limit: size,
     );
     return client.fetchLibraryPagedContent(
       widget.library.id,
       query: query,
-      libraryKind: widget.library.kind,
+      libraryKind: widget.library.browseKind,
       abort: abort,
     );
   }
@@ -894,14 +930,37 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
     _loadFirstCharacters();
   }
 
+  bool get _embyCategoricalFiltersMissing => _filters.every((f) => f.filterType == 'boolean');
+
+  Future<void> _refreshEmbyFilters() async {
+    final client = context.getMediaClientForLibrary(widget.library);
+    final result = await client.fetchLibraryFiltersWithValues(
+      widget.library.id,
+      libraryKind: widget.library.browseKind,
+    );
+    if (!mounted) return;
+    setState(() {
+      _filters = result.filters;
+      _jellyfinFilterValues = result.cachedValues;
+    });
+  }
+
   void _showFiltersBottomSheet() {
     SelectKeyUpSuppressor.suppressSelectUntilKeyUp();
-    OverlaySheetController.of(context).show(builder: (_) => _buildFiltersBottomSheet());
+    unawaited(_openFiltersBottomSheet());
+  }
+
+  Future<void> _openFiltersBottomSheet({VoidCallback? onBack}) async {
+    if (_isJellyfinLibrary && _embyCategoricalFiltersMissing) {
+      await _refreshEmbyFilters();
+    }
+    if (!mounted) return;
+    OverlaySheetController.of(context).show(builder: (_) => _buildFiltersBottomSheet(onBack: onBack));
   }
 
   void _showFiltersOptionsPage(OverlaySheetController controller) {
     SelectKeyUpSuppressor.suppressSelectUntilKeyUp();
-    controller.push(builder: (_) => _buildFiltersBottomSheet(onBack: () => controller.pop()));
+    unawaited(_openFiltersBottomSheet(onBack: () => controller.pop()));
   }
 
   Widget _buildFiltersBottomSheet({VoidCallback? onBack}) {
@@ -1562,7 +1621,9 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
 
   /// Whether the filters chip is visible
   bool get _isFiltersChipVisible =>
-      (_filters.isNotEmpty || _selectedFilters.isNotEmpty) && _selectedGrouping != 'folders';
+      _supportsBrowseFilters &&
+      _selectedGrouping != 'folders' &&
+      (_filters.isNotEmpty || _selectedFilters.isNotEmpty || _isJellyfinLibrary);
 
   /// Whether the sort chip is visible
   bool get _isSortChipVisible => _sortOptions.isNotEmpty && _selectedGrouping != 'folders';
@@ -1641,7 +1702,7 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
           key: _folderTreeKey,
           libraryKey: widget.library.id,
           serverId: widget.library.serverId,
-          libraryKind: widget.library.kind,
+          libraryKind: widget.library.browseKind,
           onRefresh: updateItem,
           firstItemFocusNode: firstItemFocusNode,
           onNavigateUp: _navigateToChips,
@@ -1867,6 +1928,7 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
       onFocusChange: (hasFocus) => trackGridItemFocus(index, hasFocus),
       onListRefresh: _loadItems,
       fullBleedImage: fullBleedImage,
+      showMediaKindBadge: _showMediaKindBadge,
     );
   }
 

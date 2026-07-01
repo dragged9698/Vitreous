@@ -661,7 +661,7 @@ class TrackSelectionService {
         if (matchedMpvTrack != null) {
           return TrackSelectionResult(matchedMpvTrack, TrackSelectionPriority.serverSelected);
         }
-      } else if (metadata.backend == MediaBackend.jellyfin) {
+      } else if (metadata.backend == MediaBackend.emby) {
         final defaultStreamIndex = info.defaultAudioStreamIndex;
         final defaultTrack = defaultStreamIndex != null
             ? info.audioTracks
@@ -748,7 +748,7 @@ class TrackSelectionService {
         if (matchedMpvTrack != null) {
           return TrackSelectionResult(matchedMpvTrack, TrackSelectionPriority.serverSelected);
         }
-      } else if (metadata.backend == MediaBackend.jellyfin) {
+      } else if (metadata.backend == MediaBackend.emby) {
         final defaultStreamIndex = info.defaultSubtitleStreamIndex;
         if (defaultStreamIndex == -1) {
           return TrackSelectionResult(SubtitleTrack.off, TrackSelectionPriority.serverSelected);
@@ -771,7 +771,7 @@ class TrackSelectionService {
             return TrackSelectionResult(matchedMpvTrack, TrackSelectionPriority.serverSelected);
           }
         }
-      } else if (metadata.backend == MediaBackend.plex && info.subtitleTracks.isNotEmpty) {
+      } else if (metadata.backend == MediaBackend.emby && info.subtitleTracks.isNotEmpty) {
         // Server has subtitle tracks but none selected — trust that decision
         return TrackSelectionResult(SubtitleTrack.off, TrackSelectionPriority.serverSelected);
       }

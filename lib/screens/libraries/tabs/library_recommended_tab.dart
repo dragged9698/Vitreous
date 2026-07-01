@@ -204,7 +204,7 @@ class _LibraryRecommendedTabState extends BaseLibraryTabState<MediaHub, LibraryR
               widget.library.id,
               libraryName: widget.library.title,
               limit: defaultHubPreviewLimit,
-              libraryKind: widget.library.kind,
+              libraryKind: widget.library.browseKind,
             ),
           );
 

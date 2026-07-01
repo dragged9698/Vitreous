@@ -1,8 +1,8 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/database/app_database.dart';
-import 'package:plezy/profiles/profile_connection.dart';
-import 'package:plezy/profiles/profile_connection_registry.dart';
+import 'package:emby_player/database/app_database.dart';
+import 'package:emby_player/profiles/profile_connection.dart';
+import 'package:emby_player/profiles/profile_connection_registry.dart';
 
 import '../test_helpers/prefs.dart';
 

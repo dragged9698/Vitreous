@@ -150,15 +150,6 @@ class ServerCapabilities {
     folderGrouping: true,
   );
 
-  /// Defaults for a Jellyfin server.
-  ///
-  /// `videoTranscoding` is `true` — `JellyfinClient.getPlaybackInitialization`
-  /// negotiates via `POST /Items/{id}/PlaybackInfo` and uses the server's
-  /// `TranscodingUrl` when a non-original quality preset is selected.
-  ///
-  /// `liveTv` is `true` because Jellyfin exposes `/LiveTv/Channels` and
-  /// `/LiveTv/Programs`. Detection + channel listing are wired today;
-  /// EPG and tuning are follow-ups.
   static const ServerCapabilities jellyfin = ServerCapabilities(
     serverSidePlayQueue: false,
     serverSidePlaylists: true,
@@ -179,6 +170,9 @@ class ServerCapabilities {
     scrubThumbnails: true,
     folderGrouping: true,
   );
+
+  /// Emby server capabilities — Jellyfin API surface with DVR enabled.
+  static final ServerCapabilities emby = jellyfin.copyWith(liveTvDvr: true);
 
   ServerCapabilities copyWith({
     bool? serverSidePlayQueue,

@@ -1,5 +1,5 @@
-name: plezy
-description: "A beautiful Plex and Jellyfin client for Flutter"
+name: emby_player
+description: "High-performance Emby client for Linux — forked from Plezy"
 publish_to: "none"
 version: 2.8.0+119
 
@@ -77,6 +77,10 @@ dependencies:
   freezed_annotation: ^3.1.0
   xml: ^6.6.1
   string_similarity: ^2.2.0
+  dio: ^5.9.2
+  flutter_animate: ^4.5.2
+  emby_core:
+    path: packages/emby_core
 
 dev_dependencies:
   flutter_test:

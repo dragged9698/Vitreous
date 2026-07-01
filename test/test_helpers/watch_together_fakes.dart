@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:plezy/mpv/mpv.dart';
-import 'package:plezy/watch_together/models/sync_message.dart';
-import 'package:plezy/watch_together/services/watch_together_peer_service.dart';
+import 'package:emby_player/mpv/mpv.dart';
+import 'package:emby_player/watch_together/models/sync_message.dart';
+import 'package:emby_player/watch_together/services/watch_together_peer_service.dart';
 
 /// Rich fake [Player] for Watch Together sync tests.
 ///

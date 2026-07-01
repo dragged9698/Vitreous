@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/ids.dart';
-import 'package:plezy/models/livetv_channel.dart';
-import 'package:plezy/utils/live_tv_grouping.dart';
+import 'package:emby_player/media/ids.dart';
+import 'package:emby_player/models/livetv_channel.dart';
+import 'package:emby_player/utils/live_tv_grouping.dart';
 
 LiveTvChannel _channel({
   required String key,

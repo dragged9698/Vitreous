@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import '../../focus/focusable_action_bar.dart';
 import '../../media/media_item.dart';
+import '../../models/download_sort.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/multi_server_provider.dart';
 import '../../services/settings_service.dart';
@@ -31,27 +32,25 @@ class DownloadsScreen extends StatefulWidget {
 
 class DownloadsScreenState extends State<DownloadsScreen>
     with TickerProviderStateMixin, TabNavigationMixin, FocusableTab {
-  // Focus nodes for tab chips
-  final _queueTabChipFocusNode = FocusNode(debugLabel: 'tab_chip_queue');
-  final _tvShowsTabChipFocusNode = FocusNode(debugLabel: 'tab_chip_tv_shows');
-  final _moviesTabChipFocusNode = FocusNode(debugLabel: 'tab_chip_movies');
+  final _manageTabChipFocusNode = FocusNode(debugLabel: 'tab_chip_manage');
+  final _browseTabChipFocusNode = FocusNode(debugLabel: 'tab_chip_browse');
   final _actionBarKey = GlobalKey<FocusableActionBarState>();
+  String _selectedLibraryKey = 'all';
 
   @override
-  List<FocusNode> get tabChipFocusNodes => [_queueTabChipFocusNode, _tvShowsTabChipFocusNode, _moviesTabChipFocusNode];
+  List<FocusNode> get tabChipFocusNodes => [_manageTabChipFocusNode, _browseTabChipFocusNode];
 
   @override
   void initState() {
     super.initState();
-    suppressAutoFocus = true; // Start suppressed
+    suppressAutoFocus = true;
     initTabNavigation();
   }
 
   @override
   void dispose() {
-    _queueTabChipFocusNode.dispose();
-    _tvShowsTabChipFocusNode.dispose();
-    _moviesTabChipFocusNode.dispose();
+    _manageTabChipFocusNode.dispose();
+    _browseTabChipFocusNode.dispose();
     disposeTabNavigation();
     super.dispose();
   }
@@ -72,17 +71,8 @@ class DownloadsScreenState extends State<DownloadsScreen>
     });
   }
 
-  /// Focus the first item in the currently active tab
   void _focusCurrentTab() {
-    // Re-enable auto-focus since user is navigating into tab content
-    setState(() {
-      suppressAutoFocus = false;
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      // Focus will be handled by the tab content
-    });
+    setState(() => suppressAutoFocus = false);
   }
 
   Widget _buildTabChip(String label, int index) {
@@ -95,24 +85,69 @@ class DownloadsScreenState extends State<DownloadsScreen>
     );
   }
 
-  /// Build the app bar title - either tabs on desktop or simple title on mobile
   Widget _buildAppBarTitle() {
-    // On desktop/TV with side nav, show tabs in app bar
     if (PlatformDetector.shouldUseSideNavigation(context)) {
       return Row(
         children: [
           _buildTabChip(t.downloads.manage, 0),
           const SizedBox(width: 8),
-          _buildTabChip(t.downloads.tvShows, 1),
-          const SizedBox(width: 8),
-          _buildTabChip(t.downloads.movies, 2),
+          _buildTabChip(t.downloads.browse, 1),
         ],
       );
     }
-
-    // On mobile, show simple title
     return Text(t.downloads.title);
   }
+
+  Future<void> _showSortPicker() async {
+    final settings = SettingsService.instance;
+    final current = settings.read(SettingsService.downloadSortOrder);
+    final picked = await showDialog<DownloadSortOrder>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(t.downloads.sortBy),
+        children: [
+          for (final option in DownloadSortOrder.values)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, option),
+              child: Text(_sortLabel(option), style: TextStyle(fontWeight: option == current ? FontWeight.bold : null)),
+            ),
+        ],
+      ),
+    );
+    if (picked != null) await settings.write(SettingsService.downloadSortOrder, picked);
+  }
+
+  Future<void> _showFilterPicker() async {
+    final settings = SettingsService.instance;
+    final current = settings.read(SettingsService.downloadFilterMode);
+    final picked = await showDialog<DownloadFilterMode>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(t.downloads.filterBy),
+        children: [
+          for (final option in DownloadFilterMode.values)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, option),
+              child: Text(_filterLabel(option), style: TextStyle(fontWeight: option == current ? FontWeight.bold : null)),
+            ),
+        ],
+      ),
+    );
+    if (picked != null) await settings.write(SettingsService.downloadFilterMode, picked);
+  }
+
+  String _sortLabel(DownloadSortOrder order) => switch (order) {
+    DownloadSortOrder.titleAsc => t.downloads.sortTitleAsc,
+    DownloadSortOrder.titleDesc => t.downloads.sortTitleDesc,
+    DownloadSortOrder.dateAddedDesc => t.downloads.sortDateDesc,
+    DownloadSortOrder.dateAddedAsc => t.downloads.sortDateAsc,
+  };
+
+  String _filterLabel(DownloadFilterMode mode) => switch (mode) {
+    DownloadFilterMode.all => t.downloads.filterAll,
+    DownloadFilterMode.unwatched => t.downloads.filterUnwatched,
+    DownloadFilterMode.watched => t.downloads.filterWatched,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +169,18 @@ class DownloadsScreenState extends State<DownloadsScreen>
                 onNavigateLeft: () => getTabChipFocusNode(tabCount - 1).requestFocus(),
                 onNavigateDown: _focusCurrentTab,
                 actions: [
+                  if (tabController.index == 1) ...[
+                    FocusableAction(
+                      icon: Symbols.sort_rounded,
+                      tooltip: t.downloads.sortBy,
+                      onPressed: _showSortPicker,
+                    ),
+                    FocusableAction(
+                      icon: Symbols.filter_list_rounded,
+                      tooltip: t.downloads.filterBy,
+                      onPressed: _showFilterPicker,
+                    ),
+                  ],
                   FocusableAction(
                     icon: Symbols.rule_settings,
                     tooltip: t.downloads.activeSyncRules,
@@ -147,36 +194,27 @@ class DownloadsScreenState extends State<DownloadsScreen>
           SliverFillRemaining(
             child: Column(
               children: [
-                // Tab selector chips (only on mobile - desktop has them in app bar)
                 if (!PlatformDetector.shouldUseSideNavigation(context))
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    alignment: .centerLeft,
+                    alignment: Alignment.centerLeft,
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
                           _buildTabChip(t.downloads.manage, 0),
                           const SizedBox(width: 8),
-                          _buildTabChip(t.downloads.tvShows, 1),
-                          const SizedBox(width: 8),
-                          _buildTabChip(t.downloads.movies, 2),
+                          _buildTabChip(t.downloads.browse, 1),
                         ],
                       ),
                     ),
                   ),
-                // Tab content
                 Expanded(
                   child: TabBarView(
                     controller: tabController,
                     children: [
                       Consumer2<DownloadProvider, MultiServerProvider>(
                         builder: (context, downloadProvider, serverProvider, _) {
-                          // Resolve the owning server's client from a download's
-                          // globalKey (`serverId:ratingKey`). Backend-neutral —
-                          // Jellyfin downloads also surface here, so the
-                          // resume/retry buttons need a [MediaServerClient]
-                          // (not a [PlexClient]) for both code paths.
                           getClient(String globalKey) {
                             final serverId = parseGlobalKey(globalKey)?.serverId ?? globalKey;
                             return serverProvider.serverManager.getClient(ServerId(serverId));
@@ -188,15 +226,11 @@ class DownloadsScreenState extends State<DownloadsScreen>
                             onPause: downloadProvider.pauseDownload,
                             onResume: (globalKey) {
                               final client = getClient(globalKey);
-                              if (client != null) {
-                                downloadProvider.resumeDownload(globalKey, client);
-                              }
+                              if (client != null) downloadProvider.resumeDownload(globalKey, client);
                             },
                             onRetry: (globalKey) {
                               final client = getClient(globalKey);
-                              if (client != null) {
-                                downloadProvider.retryDownload(globalKey, client);
-                              }
+                              if (client != null) downloadProvider.retryDownload(globalKey, client);
                             },
                             onCancel: downloadProvider.cancelDownload,
                             onDelete: downloadProvider.deleteDownload,
@@ -206,13 +240,9 @@ class DownloadsScreenState extends State<DownloadsScreen>
                           );
                         },
                       ),
-                      _DownloadsGridContent(
-                        type: DownloadType.tvShows,
-                        suppressAutoFocus: suppressAutoFocus,
-                        onBack: focusTabBar,
-                      ),
-                      _DownloadsGridContent(
-                        type: DownloadType.movies,
+                      _DownloadsBrowseTab(
+                        selectedLibraryKey: _selectedLibraryKey,
+                        onLibrarySelected: (key) => setState(() => _selectedLibraryKey = key),
                         suppressAutoFocus: suppressAutoFocus,
                         onBack: focusTabBar,
                       ),
@@ -228,15 +258,80 @@ class DownloadsScreenState extends State<DownloadsScreen>
   }
 }
 
-enum DownloadType { manage, tvShows, movies }
-
-/// Grid content for TV Shows and Movies tabs
-class _DownloadsGridContent extends StatefulWidget {
-  final DownloadType type;
+class _DownloadsBrowseTab extends StatelessWidget {
+  final String selectedLibraryKey;
+  final ValueChanged<String> onLibrarySelected;
   final bool suppressAutoFocus;
   final VoidCallback? onBack;
 
-  const _DownloadsGridContent({required this.type, required this.suppressAutoFocus, this.onBack});
+  const _DownloadsBrowseTab({
+    required this.selectedLibraryKey,
+    required this.onLibrarySelected,
+    required this.suppressAutoFocus,
+    this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<DownloadProvider>(
+      builder: (context, downloadProvider, _) {
+        final libraries = downloadProvider.downloadLibraryTabs;
+        final libraryKey = selectedLibraryKey == 'all' || libraries.every((l) => l.key != selectedLibraryKey)
+            ? 'all'
+            : selectedLibraryKey;
+        final items = libraryKey == 'all'
+            ? [
+                for (final tab in libraries) ...downloadProvider.downloadsForLibraryTab(tab.key),
+              ]
+            : downloadProvider.downloadsForLibraryTab(libraryKey);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (libraries.isNotEmpty)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(t.downloads.allLibraries),
+                        selected: libraryKey == 'all',
+                        onSelected: (_) => onLibrarySelected('all'),
+                      ),
+                    ),
+                    for (final lib in libraries)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(lib.title),
+                          selected: libraryKey == lib.key,
+                          onSelected: (_) => onLibrarySelected(lib.key),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: items.isEmpty
+                  ? EmptyStateWidget(message: t.downloads.noDownloads, subtitle: t.downloads.noDownloadsDescription)
+                  : _DownloadsGridContent(items: items, suppressAutoFocus: suppressAutoFocus, onBack: onBack),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DownloadsGridContent extends StatefulWidget {
+  final List<MediaItem> items;
+  final bool suppressAutoFocus;
+  final VoidCallback? onBack;
+
+  const _DownloadsGridContent({required this.items, required this.suppressAutoFocus, this.onBack});
 
   @override
   State<_DownloadsGridContent> createState() => _DownloadsGridContentState();
@@ -254,92 +349,64 @@ class _DownloadsGridContentState extends State<_DownloadsGridContent> {
   @override
   void didUpdateWidget(_DownloadsGridContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // When suppressAutoFocus changes from true to false, focus the first item
     if (oldWidget.suppressAutoFocus && !widget.suppressAutoFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _firstItemFocusNode.canRequestFocus) {
-          _firstItemFocusNode.requestFocus();
-        }
+        if (mounted && _firstItemFocusNode.canRequestFocus) _firstItemFocusNode.requestFocus();
       });
     }
   }
 
-  /// Navigate focus to the sidebar
   void _navigateToSidebar() {
     MainScreenFocusScope.of(context, listen: false)?.focusSidebar();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DownloadProvider>(
-      builder: (context, downloadProvider, _) {
-        final List<MediaItem> items = widget.type == DownloadType.tvShows
-            ? downloadProvider.downloadedShows
-            : downloadProvider.downloadedMovies;
-
-        if (items.isEmpty) {
-          return _buildEmptyState();
-        }
-
-        // Extra top padding for focus decoration (scale + border extends beyond item bounds)
+    return SettingsBuilder(
+      prefs: const [SettingsService.libraryDensity, SettingsService.tvFullCardLayout, SettingsService.downloadSortOrder, SettingsService.downloadFilterMode],
+      builder: (context) {
+        final settings = SettingsService.instance;
+        final density = settings.read(SettingsService.libraryDensity);
+        final fullCardLayout = PlatformDetector.isTV() && settings.read(SettingsService.tvFullCardLayout);
+        final maxCrossAxisExtent = GridSizeCalculator.getMaxCrossAxisExtent(context, density);
         const effectivePadding = EdgeInsets.only(left: 8, right: 8, top: 8);
 
-        return SettingsBuilder(
-          prefs: const [SettingsService.libraryDensity, SettingsService.tvFullCardLayout],
-          builder: (context) {
-            final settings = SettingsService.instance;
-            final density = settings.read(SettingsService.libraryDensity);
-            final fullCardLayout = PlatformDetector.isTV() && settings.read(SettingsService.tvFullCardLayout);
-            final maxCrossAxisExtent = GridSizeCalculator.getMaxCrossAxisExtent(context, density);
-            // Use LayoutBuilder to get actual available width (accounting for sidebar)
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final availableWidth = constraints.maxWidth - effectivePadding.left - effectivePadding.right;
-                final gridSpacing = MediaGridDelegate.spacingFor(context: context, fullBleedImage: fullCardLayout);
-                final columnCount = GridSizeCalculator.getColumnCount(
-                  availableWidth,
-                  maxCrossAxisExtent,
-                  crossAxisSpacing: gridSpacing,
-                );
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final availableWidth = constraints.maxWidth - effectivePadding.left - effectivePadding.right;
+            final gridSpacing = MediaGridDelegate.spacingFor(context: context, fullBleedImage: fullCardLayout);
+            final columnCount = GridSizeCalculator.getColumnCount(
+              availableWidth,
+              maxCrossAxisExtent,
+              crossAxisSpacing: gridSpacing,
+            );
 
-                return GridView.builder(
-                  padding: effectivePadding,
-                  // Allow focus decoration to render outside scroll bounds
-                  clipBehavior: Clip.none,
-                  gridDelegate: MediaGridDelegate.createDelegate(
-                    context: context,
-                    density: density,
-                    fullBleedImage: fullCardLayout,
-                  ),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    final isFirstColumn = GridSizeCalculator.isFirstColumn(index, columnCount);
-                    final isFirst = index == 0;
-                    return FocusableMediaCard(
-                      item: item,
-                      focusNode: isFirst ? _firstItemFocusNode : null,
-                      onBack: widget.onBack,
-                      isOffline: true, // Downloaded content works without server
-                      fullBleedImage: fullCardLayout,
-                      onNavigateLeft: isFirstColumn ? _navigateToSidebar : null,
-                    );
-                  },
+            return GridView.builder(
+              padding: effectivePadding,
+              clipBehavior: Clip.none,
+              gridDelegate: MediaGridDelegate.createDelegate(
+                context: context,
+                density: density,
+                fullBleedImage: fullCardLayout,
+              ),
+              itemCount: widget.items.length,
+              itemBuilder: (context, index) {
+                final item = widget.items[index];
+                final isFirstColumn = GridSizeCalculator.isFirstColumn(index, columnCount);
+                final isFirst = index == 0;
+                return FocusableMediaCard(
+                  item: item,
+                  focusNode: isFirst ? _firstItemFocusNode : null,
+                  onBack: widget.onBack,
+                  isOffline: true,
+                  fullBleedImage: fullCardLayout,
+                  onNavigateLeft: isFirstColumn ? _navigateToSidebar : null,
                 );
               },
             );
           },
         );
       },
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return EmptyStateWidget(
-      message: t.downloads.noDownloads,
-      subtitle: t.downloads.noDownloadsDescription,
-      icon: Symbols.download_rounded,
-      iconSize: 80,
     );
   }
 }

@@ -50,39 +50,74 @@ mixin _JellyfinLiveTvMethods on MediaServerCacheMixin {
 
   /// EPG / programs grid. [channelIds] scopes to specific channels (when
   /// empty, the server returns programs across all channels). [beginsAt] /
-  /// [endsAt] are epoch seconds and bound the time window — Jellyfin uses
-  /// ISO 8601 strings on the wire.
+  /// [endsAt] are epoch seconds and bound the visible window — programs that
+  /// overlap the window are included (not only those that start inside it).
   Future<List<LiveTvProgram>> fetchLiveTvPrograms({
     List<String> channelIds = const [],
     int? beginsAt,
     int? endsAt,
   }) async {
-    DateTime? toDt(int? epoch) => epoch == null ? null : DateTime.fromMillisecondsSinceEpoch(epoch * 1000, isUtc: true);
+    String? isoUtc(int? epoch) {
+      if (epoch == null) return null;
+      return DateTime.fromMillisecondsSinceEpoch(epoch * 1000, isUtc: true).toIso8601String();
+    }
+
     final params = <String, dynamic>{
-      'userId': connection.userId,
-      'enableImages': 'true',
-      'sortBy': 'StartDate',
-      'sortOrder': 'Ascending',
-      if (channelIds.isNotEmpty) 'channelIds': channelIds.join(','),
-      if (beginsAt != null) 'minStartDate': toDt(beginsAt)!.toIso8601String(),
-      if (endsAt != null) 'maxStartDate': toDt(endsAt)!.toIso8601String(),
+      'UserId': connection.userId,
+      'EnableImages': 'true',
+      'EnableTotalRecordCount': 'true',
+      'SortBy': 'StartDate',
+      'SortOrder': 'Ascending',
+      if (channelIds.isNotEmpty) 'ChannelIds': channelIds.join(','),
+      if (beginsAt != null) 'MinEndDate': isoUtc(beginsAt),
+      if (endsAt != null) 'MaxStartDate': isoUtc(endsAt),
     };
-    final items = await _safeFetchItemsArray('/LiveTv/Programs', params);
+
+    final items = await _fetchLiveTvProgramsPage(params);
     return items.map(_programFromJson).toList();
   }
 
-  LiveTvProgram _programFromJson(Map<String, dynamic> json) {
-    final id = json['Id'] as String?;
-    int? toEpochSec(dynamic raw) {
-      if (raw is! String || raw.isEmpty) return null;
-      final ms = DateTime.tryParse(raw)?.toUtc().millisecondsSinceEpoch;
-      return ms != null ? ms ~/ 1000 : null;
+  Future<List<Map<String, dynamic>>> _fetchLiveTvProgramsPage(Map<String, dynamic> baseParams) async {
+    final all = <Map<String, dynamic>>[];
+    var startIndex = 0;
+    const pageSize = 1000;
+
+    while (true) {
+      final params = {...baseParams, 'StartIndex': '$startIndex', 'Limit': '$pageSize'};
+      final response = await _http.get('/LiveTv/Programs', queryParameters: params);
+      throwIfHttpError(response);
+      final data = response.data;
+      final page = _itemsArray(data);
+      all.addAll(page);
+
+      final total = data is Map<String, dynamic>
+          ? flexibleInt(data['TotalRecordCount'] ?? data['totalRecordCount'])
+          : null;
+      if (page.isEmpty || page.length < pageSize || (total != null && all.length >= total)) break;
+      startIndex += page.length;
     }
 
-    final tags = json['ImageTags'];
+    return all;
+  }
+
+  LiveTvProgram _programFromJson(Map<String, dynamic> json) {
+    final id = jsonStringField(json, 'Id');
+    int? toEpochSec(dynamic raw) {
+      if (raw == null) return null;
+      if (raw is String) {
+        if (raw.isEmpty) return null;
+        final ms = DateTime.tryParse(raw)?.toUtc().millisecondsSinceEpoch;
+        return ms != null ? ms ~/ 1000 : null;
+      }
+      if (raw is DateTime) return raw.toUtc().millisecondsSinceEpoch ~/ 1000;
+      if (raw is num) return raw.toInt();
+      return null;
+    }
+
+    final tags = json['ImageTags'] ?? json['imageTags'];
     String? primaryTag;
     if (tags is Map<String, dynamic>) {
-      primaryTag = tags['Primary'] as String?;
+      primaryTag = jsonStringField(tags, 'Primary');
     }
     final thumbPath = (id != null && primaryTag != null)
         ? _absolutizeImagePath('/Items/${_segment(id)}/Images/Primary?tag=${Uri.encodeComponent(primaryTag)}')
@@ -90,36 +125,36 @@ mixin _JellyfinLiveTvMethods on MediaServerCacheMixin {
     return LiveTvProgram(
       key: id,
       ratingKey: id,
-      guid: null,
-      title: json['Name'] as String? ?? t.liveTv.unknownProgram,
-      summary: json['Overview'] as String?,
+      guid: id,
+      title: jsonStringField(json, 'Name') ?? t.liveTv.unknownProgram,
+      summary: jsonStringField(json, 'Overview'),
       type: 'episode',
-      year: (json['ProductionYear'] as num?)?.toInt(),
-      beginsAt: toEpochSec(json['StartDate']),
-      endsAt: toEpochSec(json['EndDate']),
-      grandparentTitle: json['SeriesName'] as String?,
-      parentTitle: json['SeasonName'] as String?,
-      index: (json['IndexNumber'] as num?)?.toInt(),
-      parentIndex: (json['ParentIndexNumber'] as num?)?.toInt(),
+      year: flexibleInt(json['ProductionYear'] ?? json['productionYear']),
+      beginsAt: toEpochSec(json['StartDate'] ?? json['startDate'] ?? jsonStringField(json, 'StartDate')),
+      endsAt: toEpochSec(json['EndDate'] ?? json['endDate'] ?? jsonStringField(json, 'EndDate')),
+      grandparentTitle: jsonStringField(json, 'SeriesName'),
+      parentTitle: jsonStringField(json, 'SeasonName'),
+      index: flexibleInt(json['IndexNumber'] ?? json['indexNumber']),
+      parentIndex: flexibleInt(json['ParentIndexNumber'] ?? json['parentIndexNumber']),
       thumb: thumbPath,
       art: null,
-      channelIdentifier: json['ChannelId'] as String?,
-      channelCallSign: json['ChannelCallSign'] as String? ?? json['ChannelName'] as String?,
-      live: json['IsLive'] as bool?,
-      premiere: json['IsPremiere'] as bool?,
+      channelIdentifier: jsonStringField(json, 'ChannelId') ?? jsonStringField(json, 'ParentId'),
+      channelCallSign: jsonStringField(json, 'ChannelCallSign') ?? jsonStringField(json, 'ChannelName'),
+      live: flexibleBoolNullable(json['IsLive'] ?? json['isLive']),
+      premiere: flexibleBoolNullable(json['IsPremiere'] ?? json['isPremiere']),
       serverId: serverId,
       serverName: serverName,
     );
   }
 
   LiveTvChannel _channelFromJson(Map<String, dynamic> json) {
-    final id = json['Id'] as String? ?? '';
-    final name = json['Name'] as String?;
-    final number = json['Number'] as String? ?? json['ChannelNumber'] as String?;
-    final tags = json['ImageTags'];
+    final id = jsonStringField(json, 'Id') ?? '';
+    final name = jsonStringField(json, 'Name');
+    final number = jsonStringField(json, 'Number') ?? jsonStringField(json, 'ChannelNumber');
+    final tags = json['ImageTags'] ?? json['imageTags'];
     String? primaryTag;
     if (tags is Map<String, dynamic>) {
-      primaryTag = tags['Primary'] as String?;
+      primaryTag = jsonStringField(tags, 'Primary');
     }
     final thumbPath = primaryTag != null
         ? _absolutizeImagePath('/Items/${_segment(id)}/Images/Primary?tag=${Uri.encodeComponent(primaryTag)}')
@@ -127,7 +162,7 @@ mixin _JellyfinLiveTvMethods on MediaServerCacheMixin {
     return LiveTvChannel(
       key: id,
       identifier: id,
-      callSign: json['CallSign'] as String?,
+      callSign: jsonStringField(json, 'CallSign'),
       title: name,
       thumb: thumbPath,
       art: null,
@@ -178,15 +213,20 @@ class _JellyfinLiveTvSupport implements LiveTvSupport {
   }
 
   @override
-  Future<LiveTvStreamResolution?> resolveStreamUrl(String channelKey, {String? dvrKey}) async {
+  Future<LiveTvStreamResolution?> resolveStreamUrl(
+    String channelKey, {
+    String? dvrKey,
+    bool directStream = true,
+    bool directStreamAudio = true,
+  }) async {
     final info = await _client.getPlaybackInfo(
       channelKey,
       autoOpenLiveStream: true,
-      enableDirectPlay: true,
-      enableDirectStream: true,
-      enableTranscoding: false,
-      allowVideoStreamCopy: true,
-      allowAudioStreamCopy: true,
+      enableDirectPlay: directStream,
+      enableDirectStream: directStream,
+      enableTranscoding: !directStream,
+      allowVideoStreamCopy: directStream,
+      allowAudioStreamCopy: directStreamAudio,
     );
     final sources = info?['MediaSources'];
     final source = sources is List && sources.isNotEmpty && sources.first is Map<String, dynamic>
@@ -197,7 +237,11 @@ class _JellyfinLiveTvSupport implements LiveTvSupport {
     String? nonEmptyString(dynamic raw) => raw is String && raw.isNotEmpty ? raw : null;
 
     var playSessionId = nonEmptyString(info?['PlaySessionId']);
-    final rawUrl = nonEmptyString(source['DirectStreamUrl']);
+    final transcodingUrl = nonEmptyString(source['TranscodingUrl']);
+    final directStreamUrl = nonEmptyString(source['DirectStreamUrl']);
+    final rawUrl = !directStream && transcodingUrl != null
+        ? transcodingUrl
+        : (directStreamUrl ?? transcodingUrl);
     final url = rawUrl != null
         ? _client._withApiKey(rawUrl)
         : _client.buildDirectStreamUrl(
@@ -206,6 +250,7 @@ class _JellyfinLiveTvSupport implements LiveTvSupport {
             mediaSourceId: nonEmptyString(source['Id']),
             playSessionId: playSessionId,
             liveStreamId: nonEmptyString(source['LiveStreamId']),
+            staticStream: directStream,
           );
     playSessionId ??= Uri.tryParse(url)?.queryParameters['PlaySessionId'];
     return LiveTvStreamResolution(url: url, playSessionId: playSessionId);
@@ -499,5 +544,13 @@ class _JellyfinLiveTvPlaybackSession implements LiveTvPlaybackSession {
   }
 
   @override
-  Future<LiveTvPlaybackSession?> recover({required bool directStream, required bool directStreamAudio}) async => this;
+  Future<LiveTvPlaybackSession?> recover({required bool directStream, required bool directStreamAudio}) async {
+    final resolution = await _client.liveTv.resolveStreamUrl(
+      _channelKey,
+      directStream: directStream,
+      directStreamAudio: directStreamAudio,
+    );
+    if (resolution == null) return null;
+    return _JellyfinLiveTvPlaybackSession(_client, _channelKey, resolution);
+  }
 }

@@ -94,7 +94,7 @@ cd "libplacebo-v${LIBPLACEBO_VERSION}"
 meson setup build \
   --prefix="$PREFIX" \
   --default-library=static \
-  -Dvulkan=disabled \
+  -Dvulkan=enabled \
   -Dd3d11=disabled \
   -Ddemos=false \
   -Dtests=false
@@ -123,7 +123,7 @@ meson setup build \
   -Dcplugins=disabled \
   -Dmanpage-build=disabled \
   -Djack=disabled \
-  -Dvulkan=disabled \
+  -Dvulkan=enabled \
   -Dd3d11=disabled \
   -Dgl=enabled \
   -Dvaapi=enabled \
@@ -131,7 +131,7 @@ meson setup build \
   -Dalsa=enabled \
   -Dpulse=enabled \
   -Dpipewire=enabled \
-  -Dwayland=disabled \
+  -Dwayland=enabled \
   -Dx11=enabled
 
 ninja -C build -j"$JOBS"

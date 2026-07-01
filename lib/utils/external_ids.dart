@@ -57,4 +57,8 @@ class ExternalIds {
     });
     return ExternalIds(imdb: imdb, tmdb: tmdb, tvdb: tvdb);
   }
+
+  /// Emby alias for [fromJellyfinProviderIds].
+  factory ExternalIds.fromEmbyProviderIds(Map<String, Object?> providerIds) =>
+      ExternalIds.fromJellyfinProviderIds(providerIds);
 }

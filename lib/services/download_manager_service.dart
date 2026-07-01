@@ -8,7 +8,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as path;
-import 'package:plezy/utils/media_server_http_client.dart';
+import 'package:emby_player/utils/media_server_http_client.dart';
 import '../database/app_database.dart';
 import '../database/download_operations.dart';
 import '../media/download_resolution.dart';
@@ -321,8 +321,8 @@ class DownloadManagerService {
             .getSingleOrNull();
     if (row == null) return null;
     return switch (row.kind) {
-      'jellyfin' => MediaBackend.jellyfin,
-      'plex' => MediaBackend.plex,
+      'jellyfin' => MediaBackend.emby,
+      'plex' => MediaBackend.emby,
       _ => null,
     };
   }
@@ -366,7 +366,7 @@ class DownloadManagerService {
       appLogger.w('Cannot pin metadata without serverId');
       return;
     }
-    if (client.backend == MediaBackend.jellyfin) {
+    if (client.backend == MediaBackend.emby) {
       try {
         await client.fetchPlaybackExtras(metadata.id);
       } catch (e) {

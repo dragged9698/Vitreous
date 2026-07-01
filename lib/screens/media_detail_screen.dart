@@ -8,8 +8,8 @@ import 'package:flutter/material.dart';
 import '../navigation/profile_navigation_scope.dart';
 import '../services/image_cache_service.dart';
 import 'package:flutter/services.dart';
-import 'package:plezy/utils/platform_detector.dart';
-import 'package:plezy/widgets/app_icon.dart';
+import 'package:emby_player/utils/platform_detector.dart';
+import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import '../widgets/collapsible_text.dart';
@@ -488,6 +488,24 @@ class _MediaDetailScreenState extends State<MediaDetailScreen>
       });
     } catch (e) {
       appLogger.d('Item refresh failed for $itemId', error: e);
+    }
+  }
+
+  Future<void> _handleFavoriteTogglePressed(MediaItem metadata) async {
+    final client = _getMediaClientForMetadata(context);
+    if (client == null) return;
+    try {
+      final next = !metadata.isFavorite;
+      await client.setFavorite(metadata, next);
+      if (!mounted) return;
+      setStateIfMounted(() {
+        if (_fullMetadata?.id == metadata.id) {
+          _fullMetadata = _fullMetadata!.withFavoriteFlag(next);
+        }
+      });
+      showSuccessSnackBar(context, next ? t.messages.addedToFavorites : t.messages.removedFromFavorites);
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, t.messages.errorLoading(error: e.toString()));
     }
   }
 
@@ -1950,7 +1968,10 @@ class _MediaDetailScreenState extends State<MediaDetailScreen>
 
   bool get _hasInfoRows {
     final metadata = _fullMetadata ?? _metadata;
-    return metadata.studio != null || metadata.contentRating != null;
+    return metadata.studio != null ||
+        metadata.contentRating != null ||
+        metadata.audioLanguage != null ||
+        metadata.effectiveSubtitleLanguage != null;
   }
 
   /// Focus the trailing info rows (studio / contentRating) and scroll them into view.
@@ -3270,6 +3291,14 @@ class _MediaDetailScreenState extends State<MediaDetailScreen>
                                       ],
                                       if (metadata.contentRating != null) ...[
                                         _buildInfoRow(t.discover.rating, formatContentRating(metadata.contentRating!)),
+                                        const SizedBox(height: 12),
+                                      ],
+                                      if (metadata.audioLanguage != null) ...[
+                                        _buildInfoRow(t.mediaDetail.audioLanguage, metadata.audioLanguage!),
+                                        const SizedBox(height: 12),
+                                      ],
+                                      if (metadata.effectiveSubtitleLanguage != null) ...[
+                                        _buildInfoRow(t.mediaDetail.subtitleLanguage, metadata.effectiveSubtitleLanguage!),
                                         const SizedBox(height: 12),
                                       ],
                                     ],

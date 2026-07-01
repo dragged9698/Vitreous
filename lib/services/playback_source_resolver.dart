@@ -76,7 +76,7 @@ class PlaybackSourceResolver {
     if (client == null || sourceKind == PlaybackSourceKind.localFile) return null;
 
     final headers = Map<String, String>.from(client.streamHeaders);
-    if (client.backend == MediaBackend.plex && sessionIdentifier != null) {
+    if (client.backend == MediaBackend.emby && sessionIdentifier != null) {
       headers['X-Plex-Session-Identifier'] = sessionIdentifier;
     }
     return headers;

@@ -58,6 +58,7 @@ import 'services/download_manager_service.dart';
 import 'services/pip_service.dart';
 import 'services/download_storage_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'services/emby_api_cache.dart';
 import 'services/jellyfin_api_cache.dart';
 import 'services/plex_api_cache.dart';
 import 'database/app_database.dart';
@@ -481,6 +482,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
     PlexApiCache.initialize(_appDatabase);
     JellyfinApiCache.initialize(_appDatabase);
+    EmbyApiCache.initialize(_appDatabase);
 
     _downloadManager = DownloadManagerService(
       database: _appDatabase,
@@ -716,6 +718,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
         ),
         ChangeNotifierProvider(
           create: (context) {
+            _serverManager.onEmbyConnectionUpdated = context.read<ConnectionRegistry>().upsert;
             _serverManager.onJellyfinConnectionUpdated = context.read<ConnectionRegistry>().upsert;
             return MultiServerProvider(_serverManager, _aggregationService);
           },
@@ -1224,7 +1227,7 @@ class _SetupScreenState extends State<SetupScreen> with MountedSetStateMixin {
     }
 
     // Repopulate metadata for downloaded items now that per-backend caches
-    // are resolvable (the Connections row + live JellyfinClient are in
+    // are resolvable (the Connections row + live EmbyClient are in
     // place). Without this the downloads list and sync-rule titles render
     // empty until something forces a later refresh.
     await downloadProvider.refreshMetadataFromCache();

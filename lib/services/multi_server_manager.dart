@@ -3,18 +3,20 @@ import '../media/ids.dart';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../connection/connection.dart';
 import '../media/media_server_client.dart';
+import '../utils/app_logger.dart';
+import '../utils/future_extensions.dart';
+import '../utils/media_server_timeouts.dart';
+import 'emby_client.dart';
+import 'emby_endpoint_discovery.dart' hide JellyfinEndpointDiscovery, JellyfinEndpointRaceResult, JellyfinServerInfo;
 import 'jellyfin_client.dart';
 import 'jellyfin_endpoint_discovery.dart';
 import 'plex_client.dart';
-import '../models/plex/plex_config.dart';
-import '../utils/app_logger.dart';
-import '../utils/media_server_timeouts.dart';
-import '../utils/future_extensions.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 import 'plex_auth_service.dart';
+import '../models/plex/plex_config.dart';
 import 'settings_service.dart';
 import 'storage_service.dart';
 
@@ -25,6 +27,7 @@ import 'storage_service.dart';
 /// backend. Onboarding helpers branch on backend (Plex `PlexServer`,
 /// Jellyfin `JellyfinConnection`) and instantiate the matching client.
 class MultiServerManager {
+  FutureOr<void> Function(EmbyConnection connection)? onEmbyConnectionUpdated;
   FutureOr<void> Function(JellyfinConnection connection)? onJellyfinConnectionUpdated;
 
   final Map<String, MediaServerClient> _clients = {};
@@ -72,12 +75,12 @@ class MultiServerManager {
 
   String? _resolveClientIdentifier(ServerId serverId) => _clientIdByServer[serverId];
 
-  /// All Jellyfin clients ever added, keyed by the compound connection id
-  /// (`{serverMachineId}/{userId}`). Lets two users on the same Jellyfin
-  /// server coexist — adding the second user's client won't tear down the
-  /// first user's in-flight operations. [_clients] holds the currently
-  /// "active" entry per machineId for everyone-pass-machineId-as-serverId
-  /// consumers (cache resolver, visibility filter, MediaItem.serverId).
+  /// All Emby clients ever added, keyed by compound connection id.
+  final Map<String, EmbyClient> _embyByCompoundId = {};
+  final Map<String, String> _activeEmbyMachine = {};
+  final Map<String, HealthStatus> _embyHealthByCompoundId = {};
+
+  /// All Jellyfin clients ever added, keyed by compound connection id.
   final Map<String, JellyfinClient> _jellyfinByCompoundId = {};
   final Map<String, String> _activeJellyfinMachine = {};
   final Map<String, HealthStatus> _jellyfinHealthByCompoundId = {};
@@ -131,7 +134,9 @@ class MultiServerManager {
   MediaServerClient? resolveDownloadClient(ServerId serverId, {String? clientScopeId}) {
     if (!isServerVisible(serverId)) return null;
     if (clientScopeId != null && clientScopeId.isNotEmpty) {
-      return getJellyfinClientByCompoundId(clientScopeId) ?? getClient(serverId);
+      return getEmbyClientByCompoundId(clientScopeId) ??
+          getJellyfinClientByCompoundId(clientScopeId) ??
+          getClient(serverId);
     }
     return getClient(serverId);
   }
@@ -156,14 +161,14 @@ class MultiServerManager {
   String? get _currentPlexLanguageCode => SettingsService.instanceOrNull?.read(SettingsService.appLocale).languageCode;
 
   @visibleForTesting
-  void debugRegisterJellyfinClientForTesting(JellyfinClient client, {bool online = true}) {
-    _wireJellyfinConnectionUpdates(client);
+  void debugRegisterEmbyClientForTesting(EmbyClient client, {bool online = true}) {
+    _wireEmbyConnectionUpdates(client);
     final compoundId = client.connection.id;
     final machineId = client.connection.serverMachineId;
-    _jellyfinByCompoundId[compoundId] = client;
-    _jellyfinHealthByCompoundId[compoundId] = online ? HealthStatus.online : HealthStatus.offline;
+    _embyByCompoundId[compoundId] = client;
+    _embyHealthByCompoundId[compoundId] = online ? HealthStatus.online : HealthStatus.offline;
     _clients[machineId] = client;
-    _activeJellyfinMachine[machineId] = compoundId;
+    _activeEmbyMachine[machineId] = compoundId;
     _serverStatus[machineId] = online;
   }
 
@@ -216,6 +221,9 @@ class MultiServerManager {
     if (client is PlexClient) {
       return _plexServers[serverId]?.owned == true;
     }
+    if (client is EmbyClient) {
+      return client.connection.isAdministrator;
+    }
     if (client is JellyfinClient) {
       return client.connection.isAdministrator;
     }
@@ -246,7 +254,7 @@ class MultiServerManager {
   /// Check whether the active or scoped client for [serverId] is online.
   bool isClientOnline(ServerId serverId, {String? clientScopeId}) {
     if (clientScopeId != null && clientScopeId.isNotEmpty) {
-      return _jellyfinHealthByCompoundId[clientScopeId] == HealthStatus.online;
+      return _embyHealthByCompoundId[clientScopeId] == HealthStatus.online;
     }
     return isServerOnline(serverId);
   }
@@ -374,14 +382,26 @@ class MultiServerManager {
 
   /// Remove a server connection
   void removeServer(ServerId serverId) {
+    final embyCompoundIds = _embyByCompoundId.entries
+        .where((entry) => entry.value.connection.serverMachineId == serverId)
+        .map((entry) => entry.key)
+        .toList();
     final jellyfinCompoundIds = _jellyfinByCompoundId.entries
         .where((entry) => entry.value.connection.serverMachineId == serverId)
         .map((entry) => entry.key)
         .toList();
-    if (jellyfinCompoundIds.isNotEmpty) {
-      final closed = <JellyfinClient>{};
+    if (embyCompoundIds.isNotEmpty || jellyfinCompoundIds.isNotEmpty) {
+      final closed = <MediaServerClient>{};
       _clients.remove(serverId);
+      _activeEmbyMachine.remove(serverId);
       _activeJellyfinMachine.remove(serverId);
+      for (final compoundId in embyCompoundIds) {
+        final client = _embyByCompoundId.remove(compoundId);
+        _embyHealthByCompoundId.remove(compoundId);
+        if (client != null && closed.add(client)) {
+          _closeClient(client);
+        }
+      }
       for (final compoundId in jellyfinCompoundIds) {
         final client = _jellyfinByCompoundId.remove(compoundId);
         _jellyfinHealthByCompoundId.remove(compoundId);
@@ -552,9 +572,65 @@ class MultiServerManager {
   /// reachable URL.
   ///
   /// Two users on the same Jellyfin server are tracked separately in
-  /// [_jellyfinByCompoundId]; only one is "active" per machineId at a time.
+  /// [_embyByCompoundId]; only one is "active" per machineId at a time.
   /// Adding the second user's connection doesn't close the first user's
   /// client (preserves any in-flight operations on the prior profile).
+  Future<bool> addEmbyConnection(EmbyConnection connection) async {
+    try {
+      var resolvedConnection = connection;
+      if (connection.baseUrls.length > 1) {
+        try {
+          final endpoint = await EmbyEndpointDiscovery().raceEndpoints(
+            connection.baseUrls,
+            preferredUrl: connection.baseUrl,
+            expectedMachineId: connection.serverMachineId,
+          );
+          resolvedConnection = connection.copyWith(
+            baseUrl: endpoint.activeBaseUrl,
+            baseUrls: endpoint.baseUrls,
+            serverName: endpoint.serverInfo.serverName,
+          );
+        } catch (e, st) {
+          appLogger.w('Emby endpoint race failed; using stored active URL', error: e, stackTrace: st);
+        }
+      }
+
+      final exhaustedMachineId = resolvedConnection.serverMachineId;
+      final exhaustedCompoundId = resolvedConnection.id;
+      final client = await EmbyClient.create(
+        resolvedConnection,
+        onAllEndpointsExhausted: () => _onEmbyEndpointsExhausted(exhaustedMachineId, exhaustedCompoundId),
+      );
+      _wireEmbyConnectionUpdates(client);
+      if (resolvedConnection.baseUrl != connection.baseUrl ||
+          !listEquals(resolvedConnection.baseUrls, connection.baseUrls)) {
+        await onEmbyConnectionUpdated?.call(resolvedConnection);
+      }
+      final compoundId = resolvedConnection.id;
+      final machineId = resolvedConnection.serverMachineId;
+
+      final oldClient = _embyByCompoundId[compoundId];
+      if (oldClient != null) _closeClient(oldClient);
+      _embyByCompoundId[compoundId] = client;
+      _clients[machineId] = client;
+      _activeEmbyMachine[machineId] = compoundId;
+
+      final health = await client.checkHealth();
+      final healthy = health == HealthStatus.online;
+      _embyHealthByCompoundId[compoundId] = health;
+      _applyHealth(ServerId(machineId), health);
+
+      appLogger.i('Added Emby server: ${resolvedConnection.serverName}${healthy ? '' : ' (unhealthy)'}');
+      if (_connectivitySubscription == null && healthy) {
+        _startNetworkMonitoring();
+      }
+      return healthy;
+    } catch (e, stackTrace) {
+      appLogger.e('Failed to add Emby server ${connection.serverName}', error: e, stackTrace: stackTrace);
+      return false;
+    }
+  }
+
   Future<bool> addJellyfinConnection(JellyfinConnection connection) async {
     try {
       var resolvedConnection = connection;
@@ -581,8 +657,6 @@ class MultiServerManager {
         resolvedConnection,
         onAllEndpointsExhausted: () => _onJellyfinEndpointsExhausted(exhaustedMachineId, exhaustedCompoundId),
       );
-      // Admin status can change server-side; re-broadcast and persist so
-      // admin-gated UI survives app restarts without requiring re-auth.
       _wireJellyfinConnectionUpdates(client);
       if (resolvedConnection.baseUrl != connection.baseUrl ||
           !listEquals(resolvedConnection.baseUrls, connection.baseUrls)) {
@@ -591,15 +665,9 @@ class MultiServerManager {
       final compoundId = resolvedConnection.id;
       final machineId = resolvedConnection.serverMachineId;
 
-      // Replace any prior client for this exact compound id (re-add of the
-      // same user — e.g., token refresh or settings re-add).
       final oldClient = _jellyfinByCompoundId[compoundId];
       if (oldClient != null) _closeClient(oldClient);
       _jellyfinByCompoundId[compoundId] = client;
-
-      // Bind this user as the active client for its machine. A previously
-      // active client for a *different* compound id stays alive in
-      // [_jellyfinByCompoundId] so a future profile switch can re-bind it.
       _clients[machineId] = client;
       _activeJellyfinMachine[machineId] = compoundId;
 
@@ -617,6 +685,24 @@ class MultiServerManager {
       appLogger.e('Failed to add Jellyfin server ${connection.serverName}', error: e, stackTrace: stackTrace);
       return false;
     }
+  }
+
+  void _wireEmbyConnectionUpdates(EmbyClient client) {
+    client.onConnectionUpdated = (updated) async {
+      if (_embyByCompoundId[updated.id] != client) {
+        appLogger.d('Ignoring stale Emby connection update for ${updated.serverName}');
+        return;
+      }
+      final persist = onEmbyConnectionUpdated;
+      if (persist != null) {
+        try {
+          await Future.sync(() => persist(updated));
+        } catch (e, st) {
+          appLogger.w('Failed to persist Emby connection update', error: e, stackTrace: st);
+        }
+      }
+      _statusController.add(Map.from(_serverStatus));
+    };
   }
 
   void _wireJellyfinConnectionUpdates(JellyfinClient client) {
@@ -637,12 +723,24 @@ class MultiServerManager {
     };
   }
 
-  /// Look up a tracked Jellyfin client by its compound id
-  /// (`{serverMachineId}/{userId}`). Returns `null` if no Jellyfin
-  /// connection with that id has been added. Useful for callers that need
-  /// the *specific* user's client, not whichever is currently active for
-  /// the machine.
+  EmbyClient? getEmbyClientByCompoundId(String compoundId) => _embyByCompoundId[compoundId];
+
   JellyfinClient? getJellyfinClientByCompoundId(String compoundId) => _jellyfinByCompoundId[compoundId];
+
+  void removeEmbyConnection(EmbyConnection connection) {
+    final compoundId = connection.id;
+    final machineId = connection.serverMachineId;
+    final client = _embyByCompoundId.remove(compoundId);
+    _embyHealthByCompoundId.remove(compoundId);
+    if (client != null) _closeClient(client);
+    if (_activeEmbyMachine[machineId] == compoundId) {
+      _activeEmbyMachine.remove(machineId);
+      _clients.remove(machineId);
+      _serverStatus.remove(machineId);
+      _authErrorServers.remove(machineId);
+      _statusController.add(Map.from(_serverStatus));
+    }
+  }
 
   /// Tear down a specific Jellyfin user's client. If it was the active one
   /// for its machine, the machine slot is cleared.
@@ -723,11 +821,22 @@ class MultiServerManager {
     final healthChecks = _clients.entries.map((entry) async {
       final serverId = entry.key;
       final client = entry.value;
-      final expectedJellyfinCompoundId = client is JellyfinClient ? client.connection.id : null;
+      final expectedCompoundId = switch (client) {
+        EmbyClient c => c.connection.id,
+        JellyfinClient c => c.connection.id,
+        _ => null,
+      };
 
       final status = await client.checkHealth();
-      if (client is JellyfinClient) {
-        final compoundId = expectedJellyfinCompoundId ?? client.connection.id;
+      if (client is EmbyClient) {
+        final compoundId = expectedCompoundId ?? client.connection.id;
+        _embyHealthByCompoundId[compoundId] = status;
+        if (_activeEmbyMachine[serverId] != compoundId) {
+          appLogger.d('Ignoring stale Emby health result for ${client.connection.serverName}');
+          return;
+        }
+      } else if (client is JellyfinClient) {
+        final compoundId = expectedCompoundId ?? client.connection.id;
         _jellyfinHealthByCompoundId[compoundId] = status;
         if (_activeJellyfinMachine[serverId] != compoundId) {
           appLogger.d('Ignoring stale Jellyfin health result for ${client.connection.serverName}');
@@ -825,8 +934,19 @@ class MultiServerManager {
       }
     }
 
-    // Jellyfin re-probes offline servers here. Online clients keep their current
-    // endpoint and can still fail over per request through JellyfinClient.
+    for (final entry in _activeEmbyMachine.entries) {
+      final serverId = entry.key;
+      if (_activeOptimizations.containsKey(serverId)) continue;
+      if (isServerOnline(ServerId(serverId))) continue;
+
+      final client = _embyByCompoundId[entry.value];
+      if (client == null) continue;
+
+      _activeOptimizations[serverId] = _reconnectEmbyServer(serverId, client).whenComplete(() {
+        _activeOptimizations.remove(serverId);
+      });
+    }
+
     for (final entry in _activeJellyfinMachine.entries) {
       final serverId = entry.key;
       if (_activeOptimizations.containsKey(serverId)) continue;
@@ -911,13 +1031,30 @@ class MultiServerManager {
     }
   }
 
+  /// Attempt reconnection for a single offline Emby server.
+  Future<void> _reconnectEmbyServer(String machineId, EmbyClient client) async {
+    final expectedCompoundId = client.connection.id;
+    try {
+      appLogger.d('Attempting reconnection for Emby server ${client.connection.serverName}');
+      final status = await client.checkHealth();
+      _embyHealthByCompoundId[expectedCompoundId] = status;
+      if (_activeEmbyMachine[machineId] != expectedCompoundId) {
+        appLogger.d('Ignoring stale Emby reconnection result for ${client.connection.serverName}');
+        return;
+      }
+      _applyHealth(ServerId(machineId), status);
+      if (status == HealthStatus.online) {
+        appLogger.i('Successfully reconnected to ${client.connection.serverName}');
+      } else {
+        appLogger.d('Reconnection probe for ${client.connection.serverName} returned ${status.name}');
+      }
+    } catch (e) {
+      appLogger.d('Reconnection failed for ${client.connection.serverName}: $e');
+      // Leave status as offline — will retry on next trigger
+    }
+  }
+
   /// Attempt reconnection for a single offline Jellyfin server.
-  ///
-  /// Jellyfin has a single fixed base URL — there's no connection-racing to
-  /// run, just a health round-trip. The existing [JellyfinClient] is reused
-  /// (the access token persists in [JellyfinConnection]); on success we flip
-  /// the machine slot back to online so MediaServer-aware UI un-greys the
-  /// entry.
   Future<void> _reconnectJellyfinServer(String machineId, JellyfinClient client) async {
     final expectedCompoundId = client.connection.id;
     try {
@@ -993,11 +1130,24 @@ class MultiServerManager {
         return future;
       }
 
-      // Jellyfin offline path — no `_plexServers` entry, but the active
-      // [JellyfinClient] is keyed by machineId in `_clients` and tracked in
-      // `_activeJellyfinMachine`. Run the same auth probe used at add time.
-      final activeCompoundId = _activeJellyfinMachine[serverId];
-      final jellyfinClient = activeCompoundId != null ? _jellyfinByCompoundId[activeCompoundId] : null;
+      final activeEmbyCompoundId = _activeEmbyMachine[serverId];
+      final embyClient = activeEmbyCompoundId != null ? _embyByCompoundId[activeEmbyCompoundId] : null;
+      if (embyClient != null) {
+        final future = _reconnectEmbyServer(serverId, embyClient)
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                appLogger.d('Emby reconnection timed out for $serverId');
+              },
+            )
+            .whenComplete(() => _activeOptimizations.remove(serverId));
+
+        _activeOptimizations[serverId] = future;
+        return future;
+      }
+
+      final activeJellyfinCompoundId = _activeJellyfinMachine[serverId];
+      final jellyfinClient = activeJellyfinCompoundId != null ? _jellyfinByCompoundId[activeJellyfinCompoundId] : null;
       if (jellyfinClient != null) {
         final future = _reconnectJellyfinServer(serverId, jellyfinClient)
             .timeout(
@@ -1028,9 +1178,11 @@ class MultiServerManager {
       _reconnectDebounce.remove(serverId);
 
       final plexServer = _plexServers[serverId];
+      final embyCompoundId = _activeEmbyMachine[serverId];
+      final embyClient = embyCompoundId != null ? _embyByCompoundId[embyCompoundId] : null;
       final jellyfinCompoundId = _activeJellyfinMachine[serverId];
       final jellyfinClient = jellyfinCompoundId != null ? _jellyfinByCompoundId[jellyfinCompoundId] : null;
-      if (plexServer == null && jellyfinClient == null) return;
+      if (plexServer == null && embyClient == null && jellyfinClient == null) return;
 
       appLogger.i('All endpoints exhausted for $serverId, triggering reconnection');
       updateServerStatus(serverId, false);
@@ -1040,6 +1192,8 @@ class MultiServerManager {
 
       final reconnect = plexServer != null
           ? _reconnectServer(serverId, plexServer)
+          : embyClient != null
+          ? _reconnectEmbyServer(serverId, embyClient)
           : _reconnectJellyfinServer(serverId, jellyfinClient!);
       _activeOptimizations[serverId] = reconnect.whenComplete(() {
         _activeOptimizations.remove(serverId);
@@ -1047,8 +1201,15 @@ class MultiServerManager {
     });
   }
 
-  /// Jellyfin clients outlive their active binding (a previous profile's
-  /// client stays in [_jellyfinByCompoundId]); only the currently bound
+  void _onEmbyEndpointsExhausted(String machineId, String compoundId) {
+    if (_activeEmbyMachine[machineId] != compoundId) {
+      appLogger.d('Ignoring endpoint exhaustion from inactive Emby client', error: compoundId);
+      return;
+    }
+    _onServerEndpointsExhausted(ServerId(machineId));
+  }
+
+  /// Jellyfin clients outlive their active binding; only the currently bound
   /// client's exhaustion may flip the machine's status.
   void _onJellyfinEndpointsExhausted(String machineId, String compoundId) {
     if (_activeJellyfinMachine[machineId] != compoundId) {
@@ -1084,8 +1245,15 @@ class MultiServerManager {
     _reconnectDebounce.clear();
     _activeHealthCheck = null;
     _activeReconnect = null;
-    final clients = <MediaServerClient>{..._clients.values, ..._jellyfinByCompoundId.values};
+    final clients = <MediaServerClient>{
+      ..._clients.values,
+      ..._embyByCompoundId.values,
+      ..._jellyfinByCompoundId.values,
+    };
     _clients.clear();
+    _embyByCompoundId.clear();
+    _activeEmbyMachine.clear();
+    _embyHealthByCompoundId.clear();
     _jellyfinByCompoundId.clear();
     _activeJellyfinMachine.clear();
     _jellyfinHealthByCompoundId.clear();

@@ -1,6 +1,6 @@
 import '../utils/app_logger.dart';
 import '../utils/session_identifier.dart';
-import 'jellyfin_client.dart';
+import '../media/media_server_client.dart';
 import 'playback_report_session.dart';
 
 /// Lightweight state machine for Jellyfin live TV playback heartbeats.
@@ -22,7 +22,7 @@ class JellyfinLiveSessionTracker {
   /// Send the appropriate heartbeat for [state] (`'playing'`, `'paused'`,
   /// or `'stopped'`). Errors are swallowed — heartbeats are best-effort.
   Future<void> report({
-    required JellyfinClient client,
+    required MediaServerClient client,
     required String itemId,
     required String state,
     required Duration position,

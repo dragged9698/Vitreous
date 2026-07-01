@@ -20,6 +20,7 @@ import '../services/trackers/mal/mal_tracker.dart';
 import '../services/trackers/simkl/simkl_tracker.dart';
 import '../services/trackers/tracker.dart';
 import '../services/trackers/tracker_constants.dart';
+import '../services/trackers/tracker_exceptions.dart';
 import '../services/trackers/tracker_id_resolver.dart';
 import '../services/trakt/trakt_scrobble_service.dart';
 import '../utils/app_logger.dart';
@@ -365,6 +366,21 @@ class _RatingBottomSheetState extends State<RatingBottomSheet> {
           setState(() {
             _statuses[key] = _SectionStatus(t.rateSheet.notAvailable, isError: true);
           });
+        } on TrackerApiException catch (e) {
+          if (e.isAccountLocked) {
+            appLogger.d('Trakt account locked while loading rating', error: e);
+            if (!mounted) return;
+            setState(() {
+              _trackerScores[source.service] = 0;
+              _statuses.remove(key);
+            });
+            return;
+          }
+          appLogger.w('Failed to load rating', error: e);
+          if (!mounted) return;
+          setState(() {
+            _statuses[key] = _SectionStatus(t.errors.failedToRate, isError: true);
+          });
         } catch (e) {
           appLogger.w('Failed to load rating', error: e);
           if (!mounted) return;
@@ -529,6 +545,14 @@ class _RatingBottomSheetState extends State<RatingBottomSheet> {
       setState(() {
         _statuses[key] = _SectionStatus(t.rateSheet.notAvailable, isError: true);
       });
+    } on TrackerApiException catch (e) {
+      appLogger.w('Failed to update rating', error: e);
+      if (!mounted) return;
+      final message = e.isAccountLocked ? t.rateSheet.traktAccountLocked : t.errors.failedToRate;
+      setState(() {
+        _statuses[key] = _SectionStatus(message, isError: true);
+      });
+      showErrorSnackBar(context, message);
     } catch (e) {
       appLogger.w('Failed to update rating', error: e);
       if (!mounted) return;
@@ -622,7 +646,7 @@ class _RatingBottomSheetState extends State<RatingBottomSheet> {
   }
 
   String _backendLabel(MediaBackend backend) => switch (backend) {
-    MediaBackend.plex => 'Plex',
+    MediaBackend.emby => 'Emby',
     MediaBackend.jellyfin => 'Jellyfin',
   };
 }

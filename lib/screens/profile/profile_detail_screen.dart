@@ -158,6 +158,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> with Controll
   Set<String> _serverIdsForConnection(Connection conn) {
     return switch (conn) {
       PlexAccountConnection(:final servers) => servers.map((s) => s.clientIdentifier).toSet(),
+      EmbyConnection(:final serverMachineId) => {serverMachineId},
       JellyfinConnection(:final serverMachineId) => {serverMachineId},
     };
   }

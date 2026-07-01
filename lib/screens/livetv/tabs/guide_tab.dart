@@ -28,7 +28,7 @@ import '../../../widgets/app_icon.dart';
 import '../../../widgets/app_menu.dart';
 import '../../../widgets/clickable_cursor.dart';
 import '../../../widgets/overlay_sheet.dart';
-import '../../../widgets/optimized_media_image.dart';
+import '../../../widgets/live_tv_channel_logo.dart';
 import '../program_details_sheet.dart';
 
 class GuideTab extends StatefulWidget {
@@ -1626,12 +1626,11 @@ class _ChannelCellState extends State<_ChannelCell> {
                     opacity: showAction ? 0.3 : 1.0,
                     duration: const Duration(milliseconds: 150),
                     child: widget.channelThumb != null && widget.client != null
-                        ? OptimizedMediaImage.thumb(
+                        ? LiveTvChannelLogo(
                             client: widget.client!,
-                            imagePath: widget.channelThumb,
+                            imagePath: widget.channelThumb!,
                             width: widget.channelColumnWidth - 16,
                             height: widget.rowHeight - 16,
-                            fit: BoxFit.contain,
                           )
                         : widget.fallbackBuilder(),
                   ),

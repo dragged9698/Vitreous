@@ -1,14 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_item.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/media/media_source_info.dart';
-import 'package:plezy/mpv/mpv.dart';
-import 'package:plezy/mpv/player/player_stream_controllers.dart';
-import 'package:plezy/services/settings_service.dart';
-import 'package:plezy/services/track_manager.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_item.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/media/media_source_info.dart';
+import 'package:emby_player/mpv/mpv.dart';
+import 'package:emby_player/mpv/player/player_stream_controllers.dart';
+import 'package:emby_player/services/settings_service.dart';
+import 'package:emby_player/services/track_manager.dart';
 
 import '../test_helpers/prefs.dart';
 

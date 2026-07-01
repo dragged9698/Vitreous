@@ -46,7 +46,7 @@ class CredentialVault {
     final copy = Map<String, Object?>.from(config);
     final tokenKey = switch (kind) {
       'plex' => 'accountToken',
-      'jellyfin' => 'accessToken',
+      'emby' || 'jellyfin' => 'accessToken',
       _ => null,
     };
     final token = tokenKey == null ? null : copy[tokenKey];
@@ -64,7 +64,7 @@ class CredentialVault {
     final copy = Map<String, dynamic>.from(config);
     final tokenKey = switch (kind) {
       'plex' => 'accountToken',
-      'jellyfin' => 'accessToken',
+      'emby' || 'jellyfin' => 'accessToken',
       _ => null,
     };
     var migrated = false;

@@ -22,6 +22,10 @@ enum MediaKind {
   /// media itself — children are fetched via
   /// `MediaServerClient.fetchFolderChildren`.
   folder,
+
+  /// Library holds multiple top-level media kinds (Emby/Jellyfin `mixed`
+  /// collection type — movies and TV shows in one view).
+  mixed,
   unknown;
 
   bool get isVideo => this == movie || this == episode || this == clip;
@@ -47,6 +51,7 @@ enum MediaKind {
     MediaKind.clip => 'clip',
     MediaKind.photo => 'photo',
     MediaKind.folder => 'folder',
+    MediaKind.mixed => 'mixed',
     MediaKind.unknown => 'unknown',
   };
 
@@ -65,6 +70,7 @@ enum MediaKind {
       'clip' || 'trailer' || 'video' || 'musicvideo' => MediaKind.clip,
       'photo' => MediaKind.photo,
       'folder' || 'collectionfolder' => MediaKind.folder,
+      'mixed' => MediaKind.mixed,
       _ => MediaKind.unknown,
     };
   }

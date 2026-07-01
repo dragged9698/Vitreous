@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/focus/focus_glow_overlay.dart';
-import 'package:plezy/focus/focus_theme.dart';
-import 'package:plezy/focus/input_mode_tracker.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_item.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/services/settings_service.dart';
-import 'package:plezy/theme/mono_theme.dart';
-import 'package:plezy/utils/layout_constants.dart';
-import 'package:plezy/utils/platform_detector.dart';
-import 'package:plezy/widgets/focusable_media_card.dart';
-import 'package:plezy/widgets/media_card.dart';
-import 'package:plezy/widgets/media_grid_delegate.dart';
+import 'package:emby_player/focus/focus_glow_overlay.dart';
+import 'package:emby_player/focus/focus_theme.dart';
+import 'package:emby_player/focus/input_mode_tracker.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_item.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/services/settings_service.dart';
+import 'package:emby_player/theme/mono_theme.dart';
+import 'package:emby_player/utils/layout_constants.dart';
+import 'package:emby_player/utils/platform_detector.dart';
+import 'package:emby_player/widgets/focusable_media_card.dart';
+import 'package:emby_player/widgets/media_card.dart';
+import 'package:emby_player/widgets/media_grid_delegate.dart';
 
 import '../test_helpers/prefs.dart';
 

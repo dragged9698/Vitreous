@@ -53,6 +53,7 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	late final TranslationsRateSheetEn rateSheet = TranslationsRateSheetEn.internal(_root);
 	late final TranslationsAccessibilityEn accessibility = TranslationsAccessibilityEn.internal(_root);
 	late final TranslationsTooltipsEn tooltips = TranslationsTooltipsEn.internal(_root);
+	late final TranslationsMediaDetailEn mediaDetail = TranslationsMediaDetailEn.internal(_root);
 	late final TranslationsVideoControlsEn videoControls = TranslationsVideoControlsEn.internal(_root);
 	late final TranslationsUserStatusEn userStatus = TranslationsUserStatusEn.internal(_root);
 	late final TranslationsMessagesEn messages = TranslationsMessagesEn.internal(_root);
@@ -846,6 +847,18 @@ class TranslationsSettingsEn {
 	/// en: 'Delete watched downloads automatically'
 	String get autoRemoveWatchedDownloadsDescription => 'Delete watched downloads automatically';
 
+	/// en: 'Auto-remove orphaned downloads'
+	String get autoRemoveOrphanedDownloads => 'Auto-remove orphaned downloads';
+
+	/// en: 'Delete local downloads when the item no longer exists on the server'
+	String get autoRemoveOrphanedDownloadsDescription => 'Delete local downloads when the item no longer exists on the server';
+
+	/// en: 'Desktop PiP width'
+	String get desktopPipWidth => 'Desktop PiP width';
+
+	/// en: 'Desktop PiP height'
+	String get desktopPipHeight => 'Desktop PiP height';
+
 	/// en: 'Downloads are blocked on cellular. Use WiFi or change the setting.'
 	String get cellularDownloadBlocked => 'Downloads are blocked on cellular. Use WiFi or change the setting.';
 
@@ -905,6 +918,15 @@ class TranslationsSettingsEn {
 
 	/// en: 'Switch HDR on for HDR content, then back to SDR'
 	String get matchDynamicRangeDescription => 'Switch HDR on for HDR content, then back to SDR';
+
+	/// en: 'Tone-map HDR to the display when using the Flutter texture player'
+	String get linuxHdrTonemapDescription => 'Tone-map HDR to the display when using the Flutter texture player';
+
+	/// en: 'HDR Passthrough (Linux)'
+	String get linuxHdrPassthrough => 'HDR Passthrough (Linux)';
+
+	/// en: 'Render with gpu-next and Vulkan/Wayland instead of the Flutter texture. Rebuild libmpv (linux/packaging/build-libmpv.sh) and enable HDR in your compositor.'
+	String get linuxHdrPassthroughDescription => 'Render with gpu-next and Vulkan/Wayland instead of the Flutter texture. Rebuild libmpv (linux/packaging/build-libmpv.sh) and enable HDR in your compositor.';
 
 	/// en: 'Display Switch Delay'
 	String get displaySwitchDelay => 'Display Switch Delay';
@@ -992,6 +1014,48 @@ class TranslationsSettingsEn {
 
 	/// en: 'Choose which section Plezy opens to when it starts'
 	String get startupSectionDescription => 'Choose which section Plezy opens to when it starts';
+
+	/// en: 'Open library directly'
+	String get openLibraryDirectly => 'Open library directly';
+
+	/// en: 'When startup is Libraries, open your last selected library browse view'
+	String get openLibraryDirectlyDescription => 'When startup is Libraries, open your last selected library browse view';
+
+	/// en: 'Always on top'
+	String get alwaysOnTopMode => 'Always on top';
+
+	/// en: 'Off'
+	String get alwaysOnTopOff => 'Off';
+
+	/// en: 'Always'
+	String get alwaysOnTopOn => 'Always';
+
+	/// en: 'When playing'
+	String get alwaysOnTopWhenPlaying => 'When playing';
+
+	/// en: 'Remember playback speed per show'
+	String get rememberPlaybackSpeedPerShow => 'Remember playback speed per show';
+
+	/// en: 'Restore the last speed used for each series or movie'
+	String get rememberPlaybackSpeedPerShowDescription => 'Restore the last speed used for each series or movie';
+
+	/// en: 'Device name'
+	String get customDeviceName => 'Device name';
+
+	/// en: 'Name shown in Emby server activity (defaults to your computer name)'
+	String get customDeviceNameDescription => 'Name shown in Emby server activity (defaults to your computer name)';
+
+	/// en: 'Leave empty to use system name'
+	String get customDeviceNameHint => 'Leave empty to use system name';
+
+	/// en: 'Load mpv scripts'
+	String get mpvLoadUserScripts => 'Load mpv scripts';
+
+	/// en: 'Load .lua scripts from the app mpv-scripts folder at playback start'
+	String get mpvLoadUserScriptsDescription => 'Load .lua scripts from the app mpv-scripts folder at playback start';
+
+	/// en: 'Scripts folder'
+	String get mpvScriptsFolder => 'Scripts folder';
 
 	/// en: 'Default to Favorite Channels'
 	String get liveTvDefaultFavorites => 'Default to Favorite Channels';
@@ -1250,6 +1314,9 @@ class TranslationsRateSheetEn {
 	/// en: 'No match found'
 	String get notAvailable => 'No match found';
 
+	/// en: 'Trakt locked your account because your collection exceeded 100,000 items. You can still rate here, but clear items at trakt.tv/users/me/collection to restore full sync.'
+	String get traktAccountLocked => 'Trakt locked your account because your collection exceeded 100,000 items. You can still rate here, but clear items at trakt.tv/users/me/collection to restore full sync.';
+
 	/// en: 'Connect a tracker in Settings to rate there.'
 	String get noConnectedTrackers => 'Connect a tracker in Settings to rate there.';
 }
@@ -1306,6 +1373,27 @@ class TranslationsTooltipsEn {
 
 	/// en: 'Mark as unwatched'
 	String get markAsUnwatched => 'Mark as unwatched';
+
+	/// en: 'Add to favorites'
+	String get addFavorite => 'Add to favorites';
+
+	/// en: 'Remove from favorites'
+	String get removeFavorite => 'Remove from favorites';
+}
+
+// Path: mediaDetail
+class TranslationsMediaDetailEn {
+	TranslationsMediaDetailEn.internal(this._root);
+
+	final Translations _root; // ignore: unused_field
+
+	// Translations
+
+	/// en: 'Audio'
+	String get audioLanguage => 'Audio';
+
+	/// en: 'Subtitles'
+	String get subtitleLanguage => 'Subtitles';
 }
 
 // Path: videoControls
@@ -1588,6 +1676,12 @@ class TranslationsMessagesEn {
 	/// en: 'Marked as unwatched (will sync when online)'
 	String get markedAsUnwatchedOffline => 'Marked as unwatched (will sync when online)';
 
+	/// en: 'Added to favorites'
+	String get addedToFavorites => 'Added to favorites';
+
+	/// en: 'Removed from favorites'
+	String get removedFromFavorites => 'Removed from favorites';
+
 	/// en: 'Auto-removed: ${title}'
 	String autoRemovedWatchedDownload({required Object title}) => 'Auto-removed: ${title}';
 
@@ -1806,6 +1900,9 @@ class TranslationsMpvConfigEn {
 
 	/// en: 'gpu-api=vulkan hwdec=auto # comment'
 	String get configPlaceholder => 'gpu-api=vulkan\nhwdec=auto\n# comment';
+
+	/// en: 'Place .lua mpv scripts in this folder. They load at playback start when enabled in Playback settings.'
+	String get scriptsHelp => 'Place .lua mpv scripts in this folder. They load at playback start when enabled in Playback settings.';
 }
 
 // Path: dialog
@@ -2982,11 +3079,47 @@ class TranslationsDownloadsEn {
 	/// en: 'Manage'
 	String get manage => 'Manage';
 
+	/// en: 'Browse'
+	String get browse => 'Browse';
+
 	/// en: 'TV Shows'
 	String get tvShows => 'TV Shows';
 
 	/// en: 'Movies'
 	String get movies => 'Movies';
+
+	/// en: 'All libraries'
+	String get allLibraries => 'All libraries';
+
+	/// en: 'Other'
+	String get otherLibrary => 'Other';
+
+	/// en: 'Sort by'
+	String get sortBy => 'Sort by';
+
+	/// en: 'Filter by'
+	String get filterBy => 'Filter by';
+
+	/// en: 'Title (A–Z)'
+	String get sortTitleAsc => 'Title (A–Z)';
+
+	/// en: 'Title (Z–A)'
+	String get sortTitleDesc => 'Title (Z–A)';
+
+	/// en: 'Date added (newest)'
+	String get sortDateDesc => 'Date added (newest)';
+
+	/// en: 'Date added (oldest)'
+	String get sortDateAsc => 'Date added (oldest)';
+
+	/// en: 'All'
+	String get filterAll => 'All';
+
+	/// en: 'Unwatched'
+	String get filterUnwatched => 'Unwatched';
+
+	/// en: 'Watched'
+	String get filterWatched => 'Watched';
 
 	/// en: 'No downloads yet'
 	String get noDownloads => 'No downloads yet';
@@ -4754,6 +4887,10 @@ extension on Translations {
 			'settings.downloadOnWifiOnlyDescription' => 'Prevent downloads when on cellular data',
 			'settings.autoRemoveWatchedDownloads' => 'Auto-remove watched downloads',
 			'settings.autoRemoveWatchedDownloadsDescription' => 'Delete watched downloads automatically',
+			'settings.autoRemoveOrphanedDownloads' => 'Auto-remove orphaned downloads',
+			'settings.autoRemoveOrphanedDownloadsDescription' => 'Delete local downloads when the item no longer exists on the server',
+			'settings.desktopPipWidth' => 'Desktop PiP width',
+			'settings.desktopPipHeight' => 'Desktop PiP height',
 			'settings.cellularDownloadBlocked' => 'Downloads are blocked on cellular. Use WiFi or change the setting.',
 			'settings.maxVolume' => 'Maximum Volume',
 			'settings.maxVolumeDescription' => 'Allow volume boost above 100% for quiet media',
@@ -4774,6 +4911,9 @@ extension on Translations {
 			'settings.matchRefreshRateDescription' => 'Match display refresh rate in fullscreen',
 			'settings.matchDynamicRange' => 'Match Dynamic Range',
 			'settings.matchDynamicRangeDescription' => 'Switch HDR on for HDR content, then back to SDR',
+			'settings.linuxHdrTonemapDescription' => 'Tone-map HDR to the display when using the Flutter texture player',
+			'settings.linuxHdrPassthrough' => 'HDR Passthrough (Linux)',
+			'settings.linuxHdrPassthroughDescription' => 'Render with gpu-next and Vulkan/Wayland instead of the Flutter texture. Rebuild libmpv (linux/packaging/build-libmpv.sh) and enable HDR in your compositor.',
 			'settings.displaySwitchDelay' => 'Display Switch Delay',
 			'settings.tunneledPlayback' => 'Tunneled Playback',
 			'settings.tunneledPlaybackDescription' => 'Use video tunneling. Disable if HDR playback shows black video.',
@@ -4803,6 +4943,20 @@ extension on Translations {
 			'settings.showNavBarLabelsDescription' => 'Display text labels under navigation bar icons',
 			'settings.startupSection' => 'Startup Section',
 			'settings.startupSectionDescription' => 'Choose which section Plezy opens to when it starts',
+			'settings.openLibraryDirectly' => 'Open library directly',
+			'settings.openLibraryDirectlyDescription' => 'When startup is Libraries, open your last selected library browse view',
+			'settings.alwaysOnTopMode' => 'Always on top',
+			'settings.alwaysOnTopOff' => 'Off',
+			'settings.alwaysOnTopOn' => 'Always',
+			'settings.alwaysOnTopWhenPlaying' => 'When playing',
+			'settings.rememberPlaybackSpeedPerShow' => 'Remember playback speed per show',
+			'settings.rememberPlaybackSpeedPerShowDescription' => 'Restore the last speed used for each series or movie',
+			'settings.customDeviceName' => 'Device name',
+			'settings.customDeviceNameDescription' => 'Name shown in Emby server activity (defaults to your computer name)',
+			'settings.customDeviceNameHint' => 'Leave empty to use system name',
+			'settings.mpvLoadUserScripts' => 'Load mpv scripts',
+			'settings.mpvLoadUserScriptsDescription' => 'Load .lua scripts from the app mpv-scripts folder at playback start',
+			'settings.mpvScriptsFolder' => 'Scripts folder',
 			'settings.liveTvDefaultFavorites' => 'Default to Favorite Channels',
 			'settings.liveTvDefaultFavoritesDescription' => 'Show only favorite channels when opening Live TV',
 			'settings.display' => 'Display',
@@ -4898,6 +5052,7 @@ extension on Translations {
 			'rateSheet.notLiked' => 'Not liked',
 			'rateSheet.saved' => 'Saved',
 			'rateSheet.notAvailable' => 'No match found',
+			'rateSheet.traktAccountLocked' => 'Trakt locked your account because your collection exceeded 100,000 items. You can still rate here, but clear items at trakt.tv/users/me/collection to restore full sync.',
 			'rateSheet.noConnectedTrackers' => 'Connect a tracker in Settings to rate there.',
 			'accessibility.mediaCardMovie' => ({required Object title}) => '${title}, movie',
 			'accessibility.mediaCardShow' => ({required Object title}) => '${title}, TV show',
@@ -4911,6 +5066,10 @@ extension on Translations {
 			'tooltips.playTrailer' => 'Play trailer',
 			'tooltips.markAsWatched' => 'Mark as watched',
 			'tooltips.markAsUnwatched' => 'Mark as unwatched',
+			'tooltips.addFavorite' => 'Add to favorites',
+			'tooltips.removeFavorite' => 'Remove from favorites',
+			'mediaDetail.audioLanguage' => 'Audio',
+			'mediaDetail.subtitleLanguage' => 'Subtitles',
 			'videoControls.audioLabel' => 'Audio',
 			'videoControls.subtitlesLabel' => 'Subtitles',
 			'videoControls.resetToZero' => 'Reset to 0ms',
@@ -5002,7 +5161,11 @@ extension on Translations {
 			'messages.markedAsUnwatched' => 'Marked as unwatched',
 			'messages.markedAsWatchedOffline' => 'Marked as watched (will sync when online)',
 			'messages.markedAsUnwatchedOffline' => 'Marked as unwatched (will sync when online)',
+			'messages.addedToFavorites' => 'Added to favorites',
+			'messages.removedFromFavorites' => 'Removed from favorites',
 			'messages.autoRemovedWatchedDownload' => ({required Object title}) => 'Auto-removed: ${title}',
+			_ => null,
+		} ?? switch (path) {
 			'messages.removedFromContinueWatching' => 'Removed from Continue Watching',
 			'messages.errorLoading' => ({required Object error}) => 'Error: ${error}',
 			'messages.fileInfoNotAvailable' => 'File information not available',
@@ -5031,8 +5194,6 @@ extension on Translations {
 			'messages.noResultsFound' => 'No results found',
 			'messages.sleepTimerSet' => ({required Object label}) => 'Sleep timer set for ${label}',
 			'messages.noItemsAvailable' => 'No items available',
-			_ => null,
-		} ?? switch (path) {
 			'messages.failedToCreatePlayQueueNoItems' => 'Failed to create play queue - no items',
 			'messages.failedPlayback' => ({required Object action, required Object error}) => 'Failed to ${action}: ${error}',
 			'messages.switchingToCompatiblePlayer' => 'Switching to compatible player...',
@@ -5071,6 +5232,7 @@ extension on Translations {
 			'mpvConfig.presetDeleted' => 'Preset deleted',
 			'mpvConfig.confirmDeletePreset' => 'Are you sure you want to delete this preset?',
 			'mpvConfig.configPlaceholder' => 'gpu-api=vulkan\nhwdec=auto\n# comment',
+			'mpvConfig.scriptsHelp' => 'Place .lua mpv scripts in this folder. They load at playback start when enabled in Playback settings.',
 			'dialog.confirmAction' => 'Confirm Action',
 			'profiles.addPlezyProfile' => 'Add Plezy profile',
 			'profiles.switchingProfile' => 'Switching profile…',
@@ -5447,8 +5609,20 @@ extension on Translations {
 			'watchTogether.guestSwitchFailed' => 'Couldn\'t switch — content not found on this server',
 			'downloads.title' => 'Downloads',
 			'downloads.manage' => 'Manage',
+			'downloads.browse' => 'Browse',
 			'downloads.tvShows' => 'TV Shows',
 			'downloads.movies' => 'Movies',
+			'downloads.allLibraries' => 'All libraries',
+			'downloads.otherLibrary' => 'Other',
+			'downloads.sortBy' => 'Sort by',
+			'downloads.filterBy' => 'Filter by',
+			'downloads.sortTitleAsc' => 'Title (A–Z)',
+			'downloads.sortTitleDesc' => 'Title (Z–A)',
+			'downloads.sortDateDesc' => 'Date added (newest)',
+			'downloads.sortDateAsc' => 'Date added (oldest)',
+			'downloads.filterAll' => 'All',
+			'downloads.filterUnwatched' => 'Unwatched',
+			'downloads.filterWatched' => 'Watched',
 			'downloads.noDownloads' => 'No downloads yet',
 			'downloads.noDownloadsDescription' => 'Downloaded content will appear here for offline viewing',
 			'downloads.downloadNow' => 'Download',
@@ -5504,6 +5678,8 @@ extension on Translations {
 			'downloads.syncAllItems' => 'Syncing all items',
 			'downloads.syncUnwatchedItems' => 'Syncing unwatched items',
 			'downloads.syncRuleServerContext' => ({required Object server, required Object status}) => 'Server: ${server} • ${status}',
+			_ => null,
+		} ?? switch (path) {
 			'downloads.syncRuleAvailable' => 'Available',
 			'downloads.syncRuleOffline' => 'Offline',
 			'downloads.syncRuleSignInRequired' => 'Sign in required',
@@ -5545,8 +5721,6 @@ extension on Translations {
 			'companionRemote.pairing.connecting' => 'Connecting...',
 			'companionRemote.pairing.searchingForDevices' => 'Looking for devices...',
 			'companionRemote.pairing.noDevicesFound' => 'No devices found on your network',
-			_ => null,
-		} ?? switch (path) {
 			'companionRemote.pairing.noDevicesHint' => 'Open Plezy on desktop and use the same WiFi',
 			'companionRemote.pairing.availableDevices' => 'Available Devices',
 			'companionRemote.pairing.manualConnection' => 'Manual Connection',

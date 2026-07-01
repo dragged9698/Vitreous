@@ -89,6 +89,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
 
         SettingsSectionHeader(t.settings.navigation),
         _startupSectionSelector(),
+        _openLibraryDirectlyTile(),
         if (Platform.isAndroid)
           SettingSwitchTile(
             pref: SettingsService.forceTvMode,
@@ -310,6 +311,13 @@ class AppearanceSettingsScreen extends StatelessWidget {
     options: _startupSectionOptions.map((id) => DialogOption(value: id, title: _startupSectionLabel(id))).toList(),
     decode: (v) => v,
     encode: (v) => v,
+  );
+
+  Widget _openLibraryDirectlyTile() => SettingSwitchTile(
+    pref: SettingsService.openLibraryDirectly,
+    icon: Symbols.menu_book_rounded,
+    title: t.settings.openLibraryDirectly,
+    subtitle: t.settings.openLibraryDirectlyDescription,
   );
 
   String _visualEffectsLabel(VisualEffectsSetting value) => switch (value) {

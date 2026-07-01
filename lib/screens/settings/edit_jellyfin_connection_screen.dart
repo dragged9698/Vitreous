@@ -9,7 +9,7 @@ import '../../focus/focusable_button.dart';
 import '../../focus/focusable_text_field.dart';
 import '../../i18n/strings.g.dart';
 import '../../mixins/controller_disposer_mixin.dart';
-import '../../services/jellyfin_endpoint_discovery.dart';
+import '../../services/emby_endpoint_discovery.dart';
 import '../../utils/app_logger.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/focused_scroll_scaffold.dart';

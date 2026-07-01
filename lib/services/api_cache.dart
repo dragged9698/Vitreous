@@ -25,7 +25,7 @@ abstract class ApiCache {
 
   /// Returns the most recently registered cache instance — used by callers
   /// that don't care which backend's helpers they're hitting (e.g. plain
-  /// `get`/`put` from `JellyfinClient`). Backend-specific operations should
+  /// `get`/`put` from `EmbyClient`). Backend-specific operations should
   /// route through [forBackend] instead.
   static ApiCache get instance {
     if (_instance == null) {
@@ -47,7 +47,7 @@ abstract class ApiCache {
   /// Pick the cache for [backend]. Plex is the legacy default — covers items
   /// predating the Connections table where the backend can't be resolved.
   static ApiCache forBackend(MediaBackend? backend) {
-    final picked = _byBackend[backend ?? MediaBackend.plex] ?? _byBackend[MediaBackend.plex];
+    final picked = _byBackend[backend ?? MediaBackend.emby] ?? _byBackend[MediaBackend.emby];
     if (picked == null) {
       throw StateError('No ApiCache registered for backend $backend');
     }

@@ -127,6 +127,31 @@ extension _VideoPlayerDisplayMatchingMethods on VideoPlayerScreenState {
     }
   }
 
+  /// Toggle mpv HDR tonemapping on Linux when match-dynamic-range is enabled.
+  Future<void> _applyLinuxHdrMatching(SettingsService settingsService) async {
+    if (player == null || !Platform.isLinux) return;
+    if (settingsService.read(SettingsService.linuxHdrPassthrough)) return;
+
+    try {
+      final matchDynamicRange = settingsService.read(SettingsService.matchDynamicRange);
+      final enableHdr = settingsService.read(SettingsService.enableHDR);
+      if (!matchDynamicRange && enableHdr) {
+        await player!.setProperty('hdr-enabled', 'yes');
+        return;
+      }
+      if (!matchDynamicRange) return;
+
+      final displayCriteria = _isTranscoding ? null : _currentMediaInfo?.displayCriteria;
+      final sigPeakStr = await player!.getProperty('video-params/sig-peak');
+      final sigPeak = double.tryParse(sigPeakStr ?? '');
+      final shouldEnableHdr =
+          displayCriteria?.isHdr == true || (sigPeak != null && sigPeak > 1.0);
+      await player!.setProperty('hdr-enabled', shouldEnableHdr ? 'yes' : 'no');
+    } catch (e) {
+      appLogger.w('Failed to apply Linux HDR matching', error: e);
+    }
+  }
+
   /// Called when fullscreen state changes — apply or restore Windows display
   /// matching. On Windows the player opens windowed by default, so the initial
   /// attempt during `playbackRestart` is skipped by DisplayModeService's

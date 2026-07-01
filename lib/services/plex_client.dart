@@ -3600,7 +3600,7 @@ class PlexClient
   /// when the user opens a filter. The result has empty [LibraryFilterResult.cachedValues];
   /// the FiltersBottomSheet hits the per-category endpoint on demand.
   @override
-  Future<LibraryFilterResult> fetchLibraryFiltersWithValues(String libraryId) async {
+  Future<LibraryFilterResult> fetchLibraryFiltersWithValues(String libraryId, {MediaKind? libraryKind}) async {
     final filters = await getLibraryFilters(libraryId);
     return LibraryFilterResult(filters: filters, cachedValues: const {});
   }
@@ -3751,6 +3751,11 @@ class PlexClient
   @override
   Future<void> removeFromContinueWatching(MediaItem item) async {
     await removeFromOnDeck(item.id);
+  }
+
+  @override
+  Future<void> setFavorite(MediaItem item, bool isFavorite) {
+    throw UnsupportedError('Plex favorites are not supported via this API.');
   }
 
   /// Rate a media item (0.0-10.0 scale, where each integer = half a star).

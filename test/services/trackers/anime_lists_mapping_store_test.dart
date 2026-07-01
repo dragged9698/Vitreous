@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/models/trackers/anime_lists_mapping.dart';
-import 'package:plezy/services/trackers/anime_lists_mapping_store.dart';
+import 'package:emby_player/models/trackers/anime_lists_mapping.dart';
+import 'package:emby_player/services/trackers/anime_lists_mapping_store.dart';
 
 void main() {
   group('AnimeListsMappingStore parser', () {

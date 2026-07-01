@@ -63,6 +63,7 @@ class TrackControlsState {
   final Function(MediaItem)? onQueueItemSelected;
   final String ratingKey;
   final String? mediaTitle;
+  final MediaItem? playbackMetadata;
   final Future<void> Function()? onSubtitleDownloaded;
 
   /// Whether OpenSubtitles search is reachable for this server. The Plex
@@ -122,6 +123,7 @@ class TrackControlsState {
     this.onQueueItemSelected,
     this.ratingKey = '',
     this.mediaTitle,
+    this.playbackMetadata,
     this.onSubtitleDownloaded,
     this.subtitleSearchSupported = true,
   });

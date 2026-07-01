@@ -301,7 +301,7 @@ class _HubDetailScreenState extends State<HubDetailScreen>
 
       _applySort();
       if (loader == null && client != null && loadedCount < totalCount) {
-        if (client.backend == MediaBackend.plex) {
+        if (client.backend == MediaBackend.emby) {
           unawaited(_loadFullHubContent(client, generation));
         } else {
           unawaited(_loadRemainingHubPages(client, generation, loadedCount, totalCount));
@@ -403,7 +403,7 @@ class _HubDetailScreenState extends State<HubDetailScreen>
     final client = serverId == null ? null : context.tryGetMediaClientForServer(ServerId(serverId));
     if (client == null || _isLoadingMore) return;
     final generation = _loadGeneration;
-    if (client.backend == MediaBackend.plex) {
+    if (client.backend == MediaBackend.emby) {
       unawaited(_loadFullHubContent(client, generation));
       return;
     }

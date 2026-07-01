@@ -556,10 +556,12 @@ extension _VideoPlayerOpenMethods on VideoPlayerScreenState {
       isTranscoding: isTranscoding,
       selectedVersion: selectedVersion,
     );
-    // Transcode streams can be seekable even when MPV cannot prove it
-    // from response headers. Reset non-transcodes so live/direct/offline
-    // streams keep native seekability detection.
-    await player.setProperty('force-seekable', isTranscoding ? 'yes' : 'no');
+    // Transcode and progressive Emby/Jellyfin direct streams can be seekable
+    // even when MPV cannot prove it from response headers. Static byte-range
+    // direct files keep native seekability detection.
+    final usesStaticDirect =
+        !isTranscoding && Uri.tryParse(videoUrl)?.queryParameters['Static']?.toLowerCase() == 'true';
+    await player.setProperty('force-seekable', (isTranscoding || !usesStaticDirect) ? 'yes' : 'no');
     if (shouldContinue != null && !shouldContinue()) return false;
     await player.open(
       Media(videoUrl, start: timing.mediaStart, headers: headers),

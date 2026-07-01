@@ -13,7 +13,7 @@ class PlexMetadataEditAdapter extends MetadataEditAdapter {
   PlexMetadataEditAdapter(this.client);
 
   @override
-  MediaBackend get backend => MediaBackend.plex;
+  MediaBackend get backend => MediaBackend.emby;
 
   @override
   MediaServerClient get mediaClient => client;

@@ -20,7 +20,7 @@ enum ImageType {
 /// - **Plex**: `/photo/:/transcode?width=W&height=H&url=...&X-Plex-Token=...`
 ///   constructed by [MediaServerClient.thumbnailUrl] (PlexClient impl).
 /// - **Jellyfin**: `/Items/{id}/Images/{type}?MaxWidth=W&MaxHeight=H&api_key=...`
-///   constructed by [MediaServerClient.thumbnailUrl] (JellyfinClient impl).
+///   constructed by [MediaServerClient.thumbnailUrl] (EmbyClient impl).
 ///
 /// Self-contained absolute URLs (Jellyfin items pre-absolutized at the
 /// model layer) get sized via query-param append so they pick up the same

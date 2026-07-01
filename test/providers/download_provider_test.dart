@@ -1,21 +1,21 @@
 import 'dart:convert';
-import 'package:plezy/media/ids.dart';
+import 'package:emby_player/media/ids.dart';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/database/app_database.dart';
-import 'package:plezy/database/download_operations.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_item.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/media/media_server_client.dart';
-import 'package:plezy/models/download_models.dart';
-import 'package:plezy/providers/download_provider.dart';
-import 'package:plezy/services/download_manager_service.dart';
-import 'package:plezy/services/download_storage_service.dart';
-import 'package:plezy/services/jellyfin_api_cache.dart';
-import 'package:plezy/services/plex_api_cache.dart';
-import 'package:plezy/utils/watch_state_notifier.dart';
+import 'package:emby_player/database/app_database.dart';
+import 'package:emby_player/database/download_operations.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_item.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/media/media_server_client.dart';
+import 'package:emby_player/models/download_models.dart';
+import 'package:emby_player/providers/download_provider.dart';
+import 'package:emby_player/services/download_manager_service.dart';
+import 'package:emby_player/services/download_storage_service.dart';
+import 'package:emby_player/services/jellyfin_api_cache.dart';
+import 'package:emby_player/services/plex_api_cache.dart';
+import 'package:emby_player/utils/watch_state_notifier.dart';
 
 /// Implements only [fetchPlayableDescendants] (the surface queueDownload
 /// reaches via [collectEpisodesForShow] / [collectEpisodesForSeason]);

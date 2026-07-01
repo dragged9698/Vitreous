@@ -1,0 +1,41 @@
+---
+description: slang i18n — string keys, locales, and regeneration workflow
+globs: "lib/i18n/**"
+alwaysApply: false
+---
+
+# Internationalization (slang)
+
+## Source files
+
+```
+lib/i18n/
+├── strings.i18n.json       # English base (or strings_en)
+├── strings_de.i18n.json    # Locale overrides
+└── strings.g.dart          # Generated — do not edit
+```
+
+## Workflow
+
+1. Add/edit keys in JSON — nested objects, **camelCase** keys.
+2. Run `dart run slang` or `scripts/codegen.sh`.
+3. Use in UI: `Text(t.section.myKey)` — import `strings.g.dart`.
+
+## Guidelines
+
+- Every user-facing string goes through slang — no hardcoded labels in widgets.
+- Keep keys organized by screen/feature (`settings`, `libraries`, `playback`, …).
+- Concise copy — TV layouts truncate aggressively.
+- Pluralization / parameters — follow slang docs via Context7 when needed.
+
+## Adding a locale
+
+1. Copy English JSON structure to `strings_<locale>.i18n.json`.
+2. Translate values only — preserve key structure.
+3. Run codegen; verify `strings_<locale>.g.dart` generated.
+
+## Forbidden
+
+- Hand-editing `strings*.g.dart`
+- User-visible English literals in `lib/screens/` or `lib/widgets/`
+- Breaking key paths without updating all locale files

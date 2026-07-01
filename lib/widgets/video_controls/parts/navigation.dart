@@ -73,7 +73,7 @@ extension _PlexVideoControlsNavigationMethods on _PlexVideoControlsState {
     // and the Plex token. Jellyfin has no analogue and the entry point
     // (`subtitleSearchSupported`) is already gated on backend, but guard
     // here too in case a future caller wires the same handler elsewhere.
-    if (widget.metadata.backend != MediaBackend.plex) return;
+    if (widget.metadata.backend != MediaBackend.emby) return;
     final serverId = widget.metadata.serverId;
     if (serverId == null) return;
 

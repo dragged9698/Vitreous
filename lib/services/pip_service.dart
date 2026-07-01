@@ -2,21 +2,32 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:plezy/i18n/strings.g.dart';
+import 'package:emby_player/i18n/strings.g.dart';
+
+import 'desktop_pip_service.dart';
 
 class PipService {
   static const MethodChannel _channel = MethodChannel('com.plezy/pip');
 
-  /// PiP is only implemented natively on Android, iOS, and macOS.
-  static bool get _isAvailable => Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+  /// PiP is implemented natively on Android, iOS, and macOS; desktop Linux/Windows
+  /// use a resizable always-on-top window via [DesktopPipService].
+  static bool get _isNativeAvailable => Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+  static bool get _isDesktopAvailable => DesktopPipService.isSupported;
 
   static final PipService _instance = PipService._internal();
   factory PipService() => _instance;
 
   PipService._internal() {
-    if (!_isAvailable) return;
-    // Listen for callbacks from native Android
-    _channel.setMethodCallHandler(_handleMethodCall);
+    if (_isNativeAvailable) {
+      _channel.setMethodCallHandler(_handleMethodCall);
+    }
+    if (_isDesktopAvailable) {
+      DesktopPipService.isActive.addListener(_syncDesktopPipState);
+    }
+  }
+
+  void _syncDesktopPipState() {
+    isPipActive.value = DesktopPipService.isActive.value;
   }
 
   /// ValueNotifier for PiP state - widgets can listen to this
@@ -38,23 +49,32 @@ class PipService {
   }
 
   static Future<bool> isSupported() async {
-    if (!_isAvailable) return false;
+    if (_isDesktopAvailable) return true;
+    if (!_isNativeAvailable) return false;
     return await _channel.invokeMethod<bool>('isSupported') ?? false;
   }
 
   /// Tell the native side whether auto-PiP is ready and the current video dimensions
   static Future<void> setAutoPipReady({required bool ready, int? width, int? height}) async {
-    if (!_isAvailable) return;
+    if (!_isNativeAvailable) return;
     await _channel.invokeMethod('setAutoPipReady', {'ready': ready, 'width': width, 'height': height});
   }
 
   static Future<void> exit() async {
-    if (!_isAvailable) return;
+    if (_isDesktopAvailable && DesktopPipService.isActive.value) {
+      await DesktopPipService.exit();
+      return;
+    }
+    if (!_isNativeAvailable) return;
     await _channel.invokeMethod('exit');
   }
 
   static Future<(bool success, String? error)> enter({int? width, int? height}) async {
-    if (!_isAvailable) return (false, null);
+    if (_isDesktopAvailable) {
+      final ok = await DesktopPipService.enter();
+      return (ok, ok ? null : t.videoControls.pipErrors.failed);
+    }
+    if (!_isNativeAvailable) return (false, null);
     final result = await _channel.invokeMethod<Map>('enter', {'width': width, 'height': height});
     if (result == null) {
       return (false, t.videoControls.pipErrors.unknown(error: 'No response'));

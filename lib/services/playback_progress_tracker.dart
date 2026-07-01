@@ -377,7 +377,7 @@ class PlaybackProgressTracker {
 
   int? _currentAudioStreamIndex(MediaSourceInfo info) {
     final playerAudioTracks = player.state.tracks.audio.where((t) => t.id != 'auto' && t.id != 'no').toList();
-    if (metadata.backend == MediaBackend.jellyfin &&
+    if (metadata.backend == MediaBackend.emby &&
         (info.audioTracks.any((track) => track.isExternal) || playerAudioTracks.length <= 1)) {
       final selectedSourceTrack = _selectedSourceAudioTrack(info);
       if (selectedSourceTrack != null) return selectedSourceTrack.id;

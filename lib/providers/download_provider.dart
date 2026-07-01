@@ -3,7 +3,6 @@ import '../media/ids.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../i18n/strings.g.dart';
-import '../media/media_backend.dart';
 import '../media/media_item.dart';
 import '../media/media_item_types.dart';
 import '../media/media_kind.dart';
@@ -26,6 +25,8 @@ import '../utils/deletion_notifier.dart';
 import '../media/episode_collection.dart';
 import '../utils/global_key_utils.dart';
 import '../utils/watch_state_notifier.dart';
+import '../models/download_sort.dart';
+import '../services/settings_service.dart';
 import '../mixins/disposable_change_notifier_mixin.dart';
 
 /// Filter mode for batch downloads (shows/seasons).
@@ -520,10 +521,7 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
             // Only Plex consumers read `raw['key']` (library-section + folder
             // navigation), so we synthesize the Plex URI for Plex shows and
             // emit a Jellyfin-shaped item for Jellyfin (Id + Type=Series).
-            final synthesizedRaw = switch (meta.backend) {
-              MediaBackend.plex => <String, dynamic>{'key': '/library/metadata/$showRatingKey'},
-              MediaBackend.jellyfin => <String, dynamic>{'Id': showRatingKey, 'Type': 'Series'},
-            };
+            final synthesizedRaw = <String, dynamic>{'Id': showRatingKey, 'Type': 'Series'};
             shows[showRatingKey] = MediaItem(
               id: showRatingKey,
               backend: meta.backend,
@@ -552,6 +550,50 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
         })
         .map((entry) => entry.value)
         .toList();
+  }
+
+  /// Library tabs for the downloads screen (completed movies + shows grouped by library).
+  List<({String key, String title})> get downloadLibraryTabs {
+    final tabs = <String, String>{};
+    for (final item in [...downloadedShows, ...downloadedMovies]) {
+      final key = item.libraryId ?? item.libraryTitle ?? '_other';
+      final title = item.libraryTitle ?? item.libraryId ?? t.downloads.otherLibrary;
+      tabs.putIfAbsent(key, () => title);
+    }
+    final sorted = tabs.entries.toList()..sort((a, b) => a.value.compareTo(b.value));
+    return [for (final e in sorted) (key: e.key, title: e.value)];
+  }
+
+  /// Completed downloads for a library tab, filtered and sorted per user prefs.
+  List<MediaItem> downloadsForLibraryTab(String libraryKey) {
+    final settings = SettingsService.instanceOrNull;
+    final sort = settings?.read(SettingsService.downloadSortOrder) ?? DownloadSortOrder.titleAsc;
+    final filter = settings?.read(SettingsService.downloadFilterMode) ?? DownloadFilterMode.all;
+
+    final items = [...downloadedShows, ...downloadedMovies].where((item) {
+      final key = item.libraryId ?? item.libraryTitle ?? '_other';
+      if (key != libraryKey) return false;
+      return switch (filter) {
+        DownloadFilterMode.all => true,
+        DownloadFilterMode.unwatched => !item.isWatched,
+        DownloadFilterMode.watched => item.isWatched,
+      };
+    }).toList();
+
+    int compareTitle(MediaItem a, MediaItem b) => a.displayTitle.compareTo(b.displayTitle);
+    int compareDate(MediaItem a, MediaItem b) => (b.addedAt ?? 0).compareTo(a.addedAt ?? 0);
+
+    switch (sort) {
+      case DownloadSortOrder.titleAsc:
+        items.sort(compareTitle);
+      case DownloadSortOrder.titleDesc:
+        items.sort((a, b) => compareTitle(b, a));
+      case DownloadSortOrder.dateAddedDesc:
+        items.sort(compareDate);
+      case DownloadSortOrder.dateAddedAsc:
+        items.sort((a, b) => compareDate(b, a));
+    }
+    return items;
   }
 
   /// Get metadata for a specific download
@@ -1461,6 +1503,16 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
           }
         } else {
           misses++;
+          if (SettingsService.instanceOrNull?.read(SettingsService.autoRemoveOrphanedDownloads) == true &&
+              _downloads.containsKey(globalKey) &&
+              _downloads[globalKey]?.status == DownloadStatus.completed) {
+            try {
+              appLogger.i('Auto-deleting orphaned download (server item gone): $globalKey');
+              await deleteDownload(globalKey);
+            } catch (e) {
+              appLogger.w('Failed to auto-delete orphaned download $globalKey: $e');
+            }
+          }
         }
       } catch (e) {
         appLogger.d('Failed to refresh metadata for $globalKey: $e');

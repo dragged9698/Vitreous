@@ -18,7 +18,7 @@ extension _VideoPlayerEpisodeQueueMethods on VideoPlayerScreenState {
     // Plex-only — Jellyfin's local queue is published by
     // EpisodeNavigationService._ensureLocalEpisodeQueue from
     // _loadAdjacentEpisodes, so this method is a no-op for it.
-    if (_currentMetadata.backend != MediaBackend.plex) return;
+    if (_currentMetadata.backend != MediaBackend.emby) return;
 
     try {
       final client = context.getPlexClientForServer(ServerId(_currentMetadata.serverId!));

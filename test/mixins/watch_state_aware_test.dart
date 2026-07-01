@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:plezy/media/ids.dart';
+import 'package:emby_player/media/ids.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/mixins/watch_state_aware.dart';
-import 'package:plezy/utils/watch_state_notifier.dart';
+import 'package:emby_player/mixins/watch_state_aware.dart';
+import 'package:emby_player/utils/watch_state_notifier.dart';
 
 class _Probe extends StatefulWidget {
   const _Probe({this.onState, this.serverIdOverride, this.globalKeysOverride, required this.itemIdsOverride});

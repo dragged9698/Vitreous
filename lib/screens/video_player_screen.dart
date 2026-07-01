@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:plezy/widgets/app_icon.dart';
+import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:os_media_controls/os_media_controls.dart';
@@ -54,6 +54,7 @@ import '../services/playback_progress_tracker.dart';
 import '../services/playback_source_resolver.dart';
 import '../services/offline_watch_sync_service.dart';
 import '../services/display_mode_service.dart';
+import '../services/mpv_script_service.dart';
 import '../services/settings_service.dart';
 import '../services/sleep_timer_service.dart';
 import '../services/track_manager.dart';
@@ -160,7 +161,7 @@ _PlaybackOpenTiming _playbackOpenTiming({
   required Duration? resumePosition,
   required int? durationMs,
 }) {
-  final usesSourceOffsetTranscode = isTranscoding && backend == MediaBackend.plex;
+  final usesSourceOffsetTranscode = isTranscoding && backend == MediaBackend.emby;
   return _PlaybackOpenTiming(
     mediaStart: usesSourceOffsetTranscode ? null : resumePosition,
     timelineOffset: usesSourceOffsetTranscode ? resumePosition ?? Duration.zero : Duration.zero,
@@ -816,8 +817,8 @@ class VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindin
         await currentPlayer.setAudioPassthrough(settingsService.read(SettingsService.audioPassthrough));
       }
 
-      // HDR is controlled via custom hdr-enabled property on iOS/macOS/Windows
-      if (Platform.isIOS || Platform.isMacOS || Platform.isWindows) {
+      // HDR is controlled via custom hdr-enabled property on desktop and mobile
+      if (Platform.isIOS || Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
         final enableHDR = settingsService.read(SettingsService.enableHDR);
         await currentPlayer.setProperty('hdr-enabled', enableHDR ? 'yes' : 'no');
       }
@@ -851,6 +852,8 @@ class VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindin
           appLogger.w('Failed to set MPV property ${entry.key}', error: e);
         }
       }
+
+      await MpvScriptService.applyToPlayer(currentPlayer);
 
       final maxVolume = settingsService.read(SettingsService.maxVolume);
       await currentPlayer.setProperty('volume-max', maxVolume.toString());

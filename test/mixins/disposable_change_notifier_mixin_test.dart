@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/mixins/disposable_change_notifier_mixin.dart';
+import 'package:emby_player/mixins/disposable_change_notifier_mixin.dart';
 
 class _Probe extends ChangeNotifier with DisposableChangeNotifierMixin {}
 

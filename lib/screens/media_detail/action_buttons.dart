@@ -194,6 +194,20 @@ extension _MediaDetailActionButtons on _MediaDetailScreenState {
           _buildWatchedToggleButton(metadata, actionButtonStyle, tvScale, showFocus: state.showFocus),
     );
 
+    final favoriteAction = !widget.isOffline
+        ? FocusableAction(
+            debugLabel: 'detail_favorite',
+            onPressed: () => unawaited(_handleFavoriteTogglePressed(metadata)),
+            builder: (context, state) => iconActionButton(
+              state,
+              onPressed: () => unawaited(_handleFavoriteTogglePressed(metadata)),
+              icon: AppIcon(metadata.isFavorite ? Symbols.favorite_rounded : Symbols.favorite_border_rounded, fill: 1),
+              tooltip: metadata.isFavorite ? t.tooltips.removeFavorite : t.tooltips.addFavorite,
+              foregroundColor: metadata.isFavorite ? Colors.red.shade300 : null,
+            ),
+          )
+        : null;
+
     void showMoreActions() => _contextMenuKey.currentState?.showContextMenu(context);
 
     final moreActionsAction = widget.isOffline
@@ -215,6 +229,7 @@ extension _MediaDetailActionButtons on _MediaDetailScreenState {
       ?trailerAction,
       ?shuffleAction,
       ?downloadAction,
+      ?favoriteAction,
       watchedAction,
       ?moreActionsAction,
     ];
@@ -246,7 +261,7 @@ extension _MediaDetailActionButtons on _MediaDetailScreenState {
         return compact;
       }
 
-      final medium = <FocusableAction>[playAction, ?downloadAction, watchedAction, ?moreActionsAction];
+      final medium = <FocusableAction>[playAction, ?downloadAction, ?favoriteAction, watchedAction, ?moreActionsAction];
       if (!maxWidth.isFinite || estimatedRowWidth(medium) <= maxWidth) return medium;
 
       final compact = <FocusableAction>[playAction, watchedAction, ?moreActionsAction];

@@ -6,8 +6,10 @@ import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 import '../models/hotkey_model.dart';
 import 'image_cache_service.dart';
-import 'package:plezy/utils/app_logger.dart';
+import 'package:emby_player/utils/app_logger.dart';
 import '../i18n/strings.g.dart';
+import '../models/always_on_top_mode.dart';
+import '../models/download_sort.dart';
 import '../models/mpv_config_models.dart';
 import '../models/external_player_models.dart';
 import 'base_shared_preferences_service.dart';
@@ -389,6 +391,7 @@ class SettingsService extends BaseSharedPreferencesService {
   static const customDownloadPathType = NullableStringPref('custom_download_path_type');
   static const downloadOnWifiOnly = BoolPref('download_on_wifi_only');
   static const autoRemoveWatchedDownloads = BoolPref('auto_remove_watched_downloads');
+  static const autoRemoveOrphanedDownloads = BoolPref('auto_remove_orphaned_downloads');
 
   /// Remembered state of the "Include Specials" toggle on the show download
   /// dialog. Defaults to true (include) so existing behavior is unchanged;
@@ -422,6 +425,31 @@ class SettingsService extends BaseSharedPreferencesService {
     values: NavigationTabId.values,
     defaultValue: NavigationTabId.discover,
   );
+  /// When [startupSection] is libraries, open this library browse view directly.
+  static const openLibraryDirectly = BoolPref('open_library_directly');
+  static final startupLibraryGlobalKey = NullableStringPref('startup_library_global_key', transform: _trimEmptyAsNull);
+  static const alwaysOnTopMode = EnumPref<AlwaysOnTopMode>(
+    'always_on_top_mode',
+    values: AlwaysOnTopMode.values,
+    defaultValue: AlwaysOnTopMode.off,
+  );
+  static const rememberPlaybackSpeedPerShow = BoolPref('remember_playback_speed_per_show', defaultValue: true);
+  static const mpvLoadUserScripts = BoolPref('mpv_load_user_scripts', defaultValue: true);
+  static final customDeviceName = NullableStringPref('custom_device_name', transform: _trimEmptyAsNull);
+  static const downloadSortOrder = EnumPref<DownloadSortOrder>(
+    'download_sort_order',
+    values: DownloadSortOrder.values,
+    defaultValue: DownloadSortOrder.titleAsc,
+  );
+  static const downloadFilterMode = EnumPref<DownloadFilterMode>(
+    'download_filter_mode',
+    values: DownloadFilterMode.values,
+    defaultValue: DownloadFilterMode.all,
+  );
+  static final desktopPipWidth = IntPref('desktop_pip_width', defaultValue: 640, transform: (v) => v.clamp(320, 3840));
+  static final desktopPipHeight = IntPref('desktop_pip_height', defaultValue: 360, transform: (v) => v.clamp(180, 2160));
+  static final desktopPipX = IntPref('desktop_pip_x', defaultValue: -1);
+  static final desktopPipY = IntPref('desktop_pip_y', defaultValue: -1);
   static const alwaysKeepSidebarOpen = BoolPref('always_keep_sidebar_open');
   static const showUnwatchedCount = BoolPref('show_unwatched_count', defaultValue: true);
   static const showEpisodeNumberOnCards = BoolPref('show_episode_number_on_cards', defaultValue: true);
@@ -443,6 +471,10 @@ class SettingsService extends BaseSharedPreferencesService {
   static const liveTvDefaultFavorites = BoolPref('live_tv_default_favorites');
   static const matchRefreshRate = BoolPref('match_refresh_rate');
   static const matchDynamicRange = BoolPref('match_dynamic_range');
+  /// When enabled on Linux, mpv renders via gpu-next in a native window for HDR
+  /// passthrough instead of the Flutter texture path. Requires a libmpv build
+  /// with Vulkan and Wayland support (see linux/packaging/build-libmpv.sh).
+  static const linuxHdrPassthrough = BoolPref('linux_hdr_passthrough');
   static const appLocale = _AppLocalePref();
   static const autoPip = _AutoPipPref();
   static const customDownloadPath = NullableStringPref('custom_download_path');
@@ -536,6 +568,12 @@ class SettingsService extends BaseSharedPreferencesService {
     defaultValue: const [],
     encode: (v) => json.encode(v.map((p) => p.toJson()).toList()),
     decode: _decodeMpvPresets,
+  );
+  static final playbackSpeedByShow = JsonPref<Map<String, double>>(
+    'playback_speed_by_show',
+    defaultValue: const {},
+    encode: json.encode,
+    decode: (raw) => (raw as Map<String, dynamic>).map((k, v) => MapEntry(k, (v as num).toDouble())),
   );
 
   static IntPref watchedThresholdPref(ServerId serverId) => IntPref('watched_threshold_$serverId', defaultValue: 90);
@@ -785,6 +823,7 @@ class SettingsService extends BaseSharedPreferencesService {
     bufferSize,
     enableHardwareDecoding,
     enableHDR,
+    linuxHdrPassthrough,
     preferredVideoCodec,
     preferredAudioCodec,
     viewMode,
@@ -827,6 +866,20 @@ class SettingsService extends BaseSharedPreferencesService {
     autoPlayNextEpisode,
     useExoPlayer,
     startupSection,
+    openLibraryDirectly,
+    startupLibraryGlobalKey,
+    alwaysOnTopMode,
+    rememberPlaybackSpeedPerShow,
+    playbackSpeedByShow,
+    mpvLoadUserScripts,
+    customDeviceName,
+    downloadSortOrder,
+    downloadFilterMode,
+    desktopPipWidth,
+    desktopPipHeight,
+    desktopPipX,
+    desktopPipY,
+    autoRemoveOrphanedDownloads,
     alwaysKeepSidebarOpen,
     showUnwatchedCount,
     showEpisodeNumberOnCards,

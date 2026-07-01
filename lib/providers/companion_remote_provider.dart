@@ -287,6 +287,8 @@ class CompanionRemoteProvider with ChangeNotifier, DisposableChangeNotifierMixin
               userUuid: userUuid,
             ),
           );
+        case EmbyConnection():
+          addContext(await _createEmbyAuthContext(connection: connection));
         case JellyfinConnection():
           addContext(await _createJellyfinAuthContext(connection: connection));
       }
@@ -344,6 +346,29 @@ class CompanionRemoteProvider with ChangeNotifier, DisposableChangeNotifierMixin
       clientIdentifier: account.clientIdentifier.isNotEmpty ? account.clientIdentifier : account.id,
       userUuid: resolvedUserUuid,
       allowedUserUuids: allowedUserUuids,
+    );
+  }
+
+  Future<RemoteAuthContext?> _createEmbyAuthContext({required EmbyConnection connection}) async {
+    if (connection.accessToken.isEmpty || connection.userId.isEmpty || connection.serverMachineId.isEmpty) {
+      appLogger.w('CompanionRemote: Skipping Emby remote identity — incomplete connection ${connection.id}');
+      return null;
+    }
+
+    final auth = RemoteAuthService.instance;
+    final homeSecret = await auth.deriveJellyfinSecret(
+      serverMachineId: connection.serverMachineId,
+      userId: connection.userId,
+    );
+    return RemoteAuthContext(
+      id: auth.computeAuthContextId(homeSecret),
+      backend: 'emby',
+      connectionId: connection.id,
+      homeSecret: homeSecret,
+      discoveryKey: await auth.deriveDiscoveryKey(homeSecret),
+      clientIdentifier: connection.deviceId.isNotEmpty ? connection.deviceId : connection.id,
+      userUuid: connection.userId,
+      allowedUserUuids: [connection.userId],
     );
   }
 

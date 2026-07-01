@@ -196,6 +196,9 @@ Set<ServerId> _serverIdsForConnection(Connection connection) {
       for (final server in servers)
         if (ServerId.tryParse(server.clientIdentifier) case final serverId?) serverId,
     },
+    EmbyConnection(:final serverMachineId) => {
+      if (ServerId.tryParse(serverMachineId) case final serverId?) serverId,
+    },
     JellyfinConnection(:final serverMachineId) => {
       if (ServerId.tryParse(serverMachineId) case final serverId?) serverId,
     },

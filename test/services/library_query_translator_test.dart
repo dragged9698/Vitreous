@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/library_query.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/services/library_query_translator.dart';
+import 'package:emby_player/media/library_query.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/services/library_query_translator.dart';
 
 void main() {
   group('PlexLibraryQueryTranslator', () {
@@ -107,9 +107,14 @@ void main() {
       expect(translator.toQueryParameters(const LibraryQuery(kind: MediaKind.photo))['IncludeItemTypes'], 'Photo');
     });
 
-    test('null kind falls back to multi-type include', () {
+    test('mixed kind maps to Movie and Series only', () {
+      final params = translator.toQueryParameters(const LibraryQuery(kind: MediaKind.mixed));
+      expect(params['IncludeItemTypes'], 'Movie,Series');
+    });
+
+    test('null kind scopes to movies and series only', () {
       final params = translator.toQueryParameters(const LibraryQuery());
-      expect(params['IncludeItemTypes'], 'Movie,Series,Episode,Audio');
+      expect(params['IncludeItemTypes'], 'Movie,Series');
     });
 
     test('genres joined with pipe separator', () {

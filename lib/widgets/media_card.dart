@@ -2,7 +2,7 @@ import 'dart:ui';
 import '../media/ids.dart';
 
 import 'package:flutter/material.dart';
-import 'package:plezy/widgets/app_icon.dart';
+import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import '../focus/card_focus_scope.dart';
@@ -27,6 +27,7 @@ import '../theme/mono_tokens.dart';
 import '../i18n/strings.g.dart';
 import 'media_context_menu.dart';
 import 'media_card_list_layout.dart';
+import 'media_kind_badge.dart';
 import 'backend_badge.dart';
 import 'optimized_media_image.dart';
 
@@ -63,6 +64,7 @@ class MediaCard extends StatefulWidget {
   final bool showServerName; // Show server name in list view (multi-server)
   final EpisodePosterMode? episodePosterModeOverride;
   final bool fullBleedImage;
+  final bool showMediaKindBadge;
 
   const MediaCard({
     super.key,
@@ -82,6 +84,7 @@ class MediaCard extends StatefulWidget {
     this.showServerName = false,
     this.episodePosterModeOverride,
     this.fullBleedImage = false,
+    this.showMediaKindBadge = false,
   }) : usesContinueWatchingAction = usesContinueWatchingAction ?? isInContinueWatching;
 
   @override
@@ -240,6 +243,7 @@ class MediaCardState extends State<MediaCard> with ContextMenuTapMixin<MediaCard
             localPosterPath: localPosterPath,
             showServerName: widget.showServerName,
             episodePosterModeOverride: widget.episodePosterModeOverride,
+            showMediaKindBadge: widget.showMediaKindBadge,
           );
 
     // MediaContextMenu as a non-widget helper — only wrap with its key for
@@ -319,7 +323,10 @@ class MediaCardState extends State<MediaCard> with ContextMenuTapMixin<MediaCard
                   knownWidth: width,
                   knownHeight: height,
                 ),
-                if (item is MediaItem) WatchedIndicator(item: item),
+                if (item is MediaItem) ...[
+                  if (widget.showMediaKindBadge) MediaKindBadge(item: item),
+                  WatchedIndicator(item: item),
+                ],
               ],
             ),
           ),
@@ -352,7 +359,10 @@ class MediaCardState extends State<MediaCard> with ContextMenuTapMixin<MediaCard
               knownHeight: posterHeight,
             ),
           ),
-          if (item is MediaItem) WatchedIndicator(item: item),
+          if (item is MediaItem) ...[
+            if (widget.showMediaKindBadge) MediaKindBadge(item: item),
+            WatchedIndicator(item: item),
+          ],
         ],
       ),
     );
@@ -421,6 +431,7 @@ class _MediaCardList extends StatelessWidget {
   final String? localPosterPath;
   final bool showServerName;
   final EpisodePosterMode? episodePosterModeOverride;
+  final bool showMediaKindBadge;
 
   const _MediaCardList({
     required this.item,
@@ -435,6 +446,7 @@ class _MediaCardList extends StatelessWidget {
     this.localPosterPath,
     this.showServerName = false,
     this.episodePosterModeOverride,
+    this.showMediaKindBadge = false,
   });
 
   bool _usesWideAspectRatio() {
@@ -618,7 +630,10 @@ class _MediaCardList extends StatelessWidget {
                         episodePosterModeOverride: episodePosterModeOverride,
                       ),
                     ),
-                    if (item is MediaItem) WatchedIndicator(item: item as MediaItem),
+                    if (item is MediaItem) ...[
+                      if (showMediaKindBadge) MediaKindBadge(item: item as MediaItem),
+                      WatchedIndicator(item: item as MediaItem),
+                    ],
                   ],
                 ),
               ),

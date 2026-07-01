@@ -1,10 +1,13 @@
 import '../models/livetv_channel.dart';
 import '../models/livetv_program.dart';
+import 'json_utils.dart';
 
 bool liveTvProgramMatchesChannel(LiveTvProgram program, LiveTvChannel channel) {
   final programChannel = _nonEmpty(program.channelIdentifier);
   if (programChannel == null) return false;
-  if (programChannel != channel.key && programChannel != channel.identifier) return false;
+  if (!jsonIdsEqual(programChannel, channel.key) && !jsonIdsEqual(programChannel, channel.identifier)) {
+    return false;
+  }
 
   if (!_nullableIdsMatch(program.serverId, channel.serverId)) return false;
   if (!_nullableIdsMatch(program.liveDvrKey, channel.liveDvrKey)) return false;
@@ -33,7 +36,8 @@ String? liveTvProviderIdentifierForChannel(LiveTvChannel channel) {
 bool _nullableIdsMatch(String? a, String? b) {
   final left = _nonEmpty(a);
   final right = _nonEmpty(b);
-  return left == null || right == null || left == right;
+  if (left == null || right == null) return true;
+  return jsonIdsEqual(left, right);
 }
 
 String? _nonEmpty(String? value) {

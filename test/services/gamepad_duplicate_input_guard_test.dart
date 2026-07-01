@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/services/gamepad_service.dart';
+import 'package:emby_player/services/gamepad_service.dart';
 
 void main() {
   group('GamepadDuplicateInputGuard', () {

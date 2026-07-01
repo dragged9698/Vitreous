@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:plezy/widgets/app_icon.dart';
+import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../focus/dpad_navigator.dart';
 import '../../focus/focusable_text_field.dart';
@@ -12,6 +12,7 @@ import '../../utils/dialogs.dart';
 import '../../utils/platform_detector.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../mixins/settings_effect_mixin.dart';
+import '../../services/mpv_script_service.dart';
 import '../../services/settings_service.dart';
 import '../../widgets/app_menu.dart';
 import '../../widgets/focused_scroll_scaffold.dart';
@@ -115,6 +116,8 @@ class _MpvConfigScreenState extends State<MpvConfigScreen> with SettingsEffectMi
                   delegate: SliverChildListDelegate([
                     _buildConfigEditor(),
                     const SizedBox(height: 16),
+                    _buildScriptsCard(),
+                    const SizedBox(height: 16),
                     _buildPresetsCard(),
                     const SizedBox(height: 24),
                   ]),
@@ -187,6 +190,30 @@ class _MpvConfigScreenState extends State<MpvConfigScreen> with SettingsEffectMi
         style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
         onChanged: (_) => _saveText(),
       ),
+    );
+  }
+
+  Widget _buildScriptsCard() {
+    return FutureBuilder<String>(
+      future: MpvScriptService.scriptsDirectoryPath(),
+      builder: (context, snapshot) {
+        final path = snapshot.data ?? '…';
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(t.settings.mpvScriptsFolder, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                SelectableText(path, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                const SizedBox(height: 8),
+                Text(t.mpvConfig.scriptsHelp, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

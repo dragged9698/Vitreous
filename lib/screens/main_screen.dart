@@ -989,7 +989,18 @@ class _MainScreenState extends State<MainScreen>
     final pending = _pendingStartupTab;
     if (pending != null && _getVisibleTabs(_isOffline).any((t) => t.id == pending)) {
       _selectTab(pending);
+      if (pending == NavigationTabId.libraries) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _applyDirectLibraryStartup());
+      }
     }
+  }
+
+  void _applyDirectLibraryStartup() {
+    final settings = SettingsService.instanceOrNull;
+    if (settings == null || !settings.read(SettingsService.openLibraryDirectly)) return;
+    final libraryKey = settings.read(SettingsService.startupLibraryGlobalKey);
+    if (libraryKey == null || libraryKey.isEmpty) return;
+    _selectLibrary(libraryKey);
   }
 
   void _handleOfflineStatusChanged() {
@@ -1048,7 +1059,9 @@ class _MainScreenState extends State<MainScreen>
         final mp = context.read<MultiServerProvider>();
         final binder = context.read<ActiveProfileBinder>();
         binder.start();
-        if (!mp.hasConnectedServers && context.read<ActiveProfileProvider>().active != null) {
+        if (!mp.hasConnectedServers &&
+            context.read<ActiveProfileProvider>().active != null &&
+            !mp.hasAuthErrorServers) {
           await binder.rebindActive();
           if (!mounted) return;
         }
@@ -1420,6 +1433,7 @@ class _MainScreenState extends State<MainScreen>
   /// Handle library selection from side navigation rail
   void _selectLibrary(String libraryGlobalKey) {
     _selectedLibraryGlobalKey = libraryGlobalKey;
+    unawaited(SettingsService.instance.write(SettingsService.startupLibraryGlobalKey, libraryGlobalKey));
     _selectTab(NavigationTabId.libraries);
     // Tell LibrariesScreen to load this library after tab switch
     if (_librariesKey.currentState case final LibraryLoadable loadable) {
@@ -1443,6 +1457,7 @@ class _MainScreenState extends State<MainScreen>
   void _handleLibrariesScreenSelected(String libraryGlobalKey) {
     if (_selectedLibraryGlobalKey == libraryGlobalKey) return;
     setState(() => _selectedLibraryGlobalKey = libraryGlobalKey);
+    unawaited(SettingsService.instance.write(SettingsService.startupLibraryGlobalKey, libraryGlobalKey));
   }
 
   void _showLibraryQuickPicker(BuildContext context) {

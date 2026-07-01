@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/screens/settings/settings_utils.dart';
-import 'package:plezy/utils/platform_detector.dart';
+import 'package:emby_player/screens/settings/settings_utils.dart';
+import 'package:emby_player/utils/platform_detector.dart';
 
 void main() {
   tearDown(() {

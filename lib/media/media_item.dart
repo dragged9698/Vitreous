@@ -82,7 +82,7 @@ sealed class MediaItem with _$MediaItem {
     Map<String, Object?>? raw,
   }) {
     return switch (backend) {
-      MediaBackend.plex => PlexMediaItem(
+      MediaBackend.emby => JellyfinMediaItem(
         id: id,
         kind: kind,
         guid: guid,
@@ -133,14 +133,12 @@ sealed class MediaItem with _$MediaItem {
         libraryId: libraryId,
         libraryTitle: libraryTitle,
         audioLanguage: audioLanguage,
-        subtitleLanguage: subtitleLanguage,
-        subtitleMode: subtitleMode,
         serverId: serverId,
         serverName: serverName,
         backendFolderKey: backendFolderKey,
-        raw: raw,
+        raw: {...?raw, '__backend': MediaBackend.emby.id},
       ),
-      MediaBackend.jellyfin => JellyfinMediaItem(
+      MediaBackend.jellyfin => MediaItem.jellyfin(
         id: id,
         kind: kind,
         guid: guid,
@@ -194,7 +192,7 @@ sealed class MediaItem with _$MediaItem {
         serverId: serverId,
         serverName: serverName,
         backendFolderKey: backendFolderKey,
-        raw: raw,
+        raw: {...?raw, '__backend': MediaBackend.jellyfin.id},
       ),
     };
   }
@@ -343,24 +341,28 @@ sealed class MediaItem with _$MediaItem {
   }) = JellyfinMediaItem;
 
   MediaBackend get backend => switch (this) {
-    PlexMediaItem() => MediaBackend.plex,
-    JellyfinMediaItem() => MediaBackend.jellyfin,
+    PlexMediaItem() => MediaBackend.emby,
+    JellyfinMediaItem(:final raw) => MediaBackend.fromString(raw?['__backend'] as String?),
   };
 
   /// Restore a [MediaItem] from a [toJson] payload. Missing/unknown backend
   /// values use [MediaBackend.fromString] so old offline cache rows remain
   /// readable instead of throwing before union dispatch.
   factory MediaItem.fromJson(Map<String, dynamic> json) {
-    return switch (MediaBackend.fromString(json['backend'] as String?)) {
-      MediaBackend.plex => _$PlexMediaItemFromJson(json),
-      MediaBackend.jellyfin => _$JellyfinMediaItemFromJson(json),
+    return switch (json['backend'] as String?) {
+      'plex' => _$PlexMediaItemFromJson(json),
+      'emby' => _$JellyfinMediaItemFromJson(json),
+      _ => _$JellyfinMediaItemFromJson(json),
     };
   }
 
   Map<String, dynamic> toJson() {
     return switch (this) {
-      final PlexMediaItem item => {'backend': MediaBackend.plex.id, ..._$PlexMediaItemToJson(item)},
-      final JellyfinMediaItem item => {'backend': MediaBackend.jellyfin.id, ..._$JellyfinMediaItemToJson(item)},
+      final PlexMediaItem item => {'backend': MediaBackend.emby.id, ..._$PlexMediaItemToJson(item)},
+      final JellyfinMediaItem item => {
+        'backend': item.backend.id,
+        ..._$JellyfinMediaItemToJson(item),
+      },
     };
   }
 
@@ -423,6 +425,52 @@ sealed class MediaItem with _$MediaItem {
       updated = updated.copyWith(viewedLeafCount: isWatched ? (leafCount ?? viewedLeafCount ?? 1) : 0);
     }
     return updated;
+  }
+
+  /// Whether the item is marked favorite on the server (`UserData.IsFavorite`).
+  bool get isFavorite {
+    final userData = raw?['UserData'];
+    if (userData is Map<String, dynamic>) return userData['IsFavorite'] == true;
+    return false;
+  }
+
+  /// Copy with favorite flag patched into embedded `UserData`.
+  MediaItem withFavoriteFlag(bool isFavorite) {
+    final nextRaw = Map<String, Object?>.from(raw ?? const {});
+    final userData = Map<String, Object?>.from((nextRaw['UserData'] as Map<String, Object?>?) ?? const {});
+    userData['IsFavorite'] = isFavorite;
+    nextRaw['UserData'] = userData;
+    return copyWith(raw: nextRaw);
+  }
+
+  /// Subtitle language from model fields or Emby/Jellyfin raw payload.
+  String? get effectiveSubtitleLanguage {
+    return switch (this) {
+      PlexMediaItem(:final subtitleLanguage) => subtitleLanguage,
+      _ => _subtitleLanguageFromRaw(raw),
+    };
+  }
+
+  static String? _subtitleLanguageFromRaw(Map<String, Object?>? raw) {
+    if (raw == null) return null;
+    final direct = raw['PreferredSubtitleLanguage'];
+    if (direct is String && direct.isNotEmpty) return direct;
+    final sources = raw['MediaSources'];
+    if (sources is! List) return null;
+    for (final source in sources) {
+      if (source is! Map<String, dynamic>) continue;
+      final streams = source['MediaStreams'];
+      if (streams is! List) continue;
+      for (final stream in streams) {
+        if (stream is! Map<String, dynamic>) continue;
+        if (stream['Type'] != 'Subtitle') continue;
+        if (stream['IsDefault'] == true || stream['IsForced'] == true) {
+          final lang = stream['Language'] as String?;
+          if (lang != null && lang.isNotEmpty) return lang;
+        }
+      }
+    }
+    return null;
   }
 
   /// Display-friendly title that prefers the show name for episodes/seasons.

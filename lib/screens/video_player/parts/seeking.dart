@@ -18,7 +18,7 @@ extension _VideoPlayerSeekingMethods on VideoPlayerScreenState {
     return _isTranscoding &&
         !widget.isLive &&
         !_isOfflinePlayback &&
-        _currentMetadata.backend == MediaBackend.plex &&
+        _currentMetadata.backend == MediaBackend.emby &&
         _selectedQualityPreset != TranscodeQualityPreset.original;
   }
 

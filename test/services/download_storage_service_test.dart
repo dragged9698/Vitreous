@@ -1,14 +1,14 @@
 import 'dart:io';
-import 'package:plezy/media/ids.dart';
+import 'package:emby_player/media/ids.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_item.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/services/download_storage_service.dart';
-import 'package:plezy/services/settings_service.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_item.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/services/download_storage_service.dart';
+import 'package:emby_player/services/settings_service.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import '../test_helpers/prefs.dart';

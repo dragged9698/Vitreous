@@ -1183,7 +1183,12 @@ class _PlexLiveTvSupport implements LiveTvSupport {
   }
 
   @override
-  Future<LiveTvStreamResolution?> resolveStreamUrl(String channelKey, {String? dvrKey}) async => null;
+  Future<LiveTvStreamResolution?> resolveStreamUrl(
+    String channelKey, {
+    String? dvrKey,
+    bool directStream = true,
+    bool directStreamAudio = true,
+  }) async => null;
 
   @override
   Future<LiveTvPlaybackSession?> startPlayback(String channelKey, {String? dvrKey}) {

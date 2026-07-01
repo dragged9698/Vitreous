@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/profiles/profile.dart';
+import 'package:emby_player/profiles/profile.dart';
 
 void main() {
   group('Profile', () {

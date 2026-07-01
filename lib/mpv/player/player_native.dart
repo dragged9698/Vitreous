@@ -4,14 +4,18 @@ import 'dart:io' show Platform;
 import 'package:flutter/services.dart';
 
 import '../../media/media_display_criteria.dart';
+import '../../services/settings_service.dart';
 import '../models.dart';
 import 'player_base.dart';
 
 /// MPV-backed player for platforms where AetherEngine is not the native route.
 class PlayerNative extends PlayerBase {
   int? _textureIdValue;
+  bool _linuxEmbedMode = false;
   String _dvConversionMode = 'auto';
   String _dvConversionLog = 'no';
+
+  bool get usesLinuxEmbed => _linuxEmbedMode;
 
   @override
   int? get textureId => _textureIdValue;
@@ -122,12 +126,23 @@ class PlayerNative extends PlayerBase {
 
   Future<void> _doInitialize() async {
     try {
-      final result = await invoke<Object>('initialize');
+      Object? result;
+      if (Platform.isLinux) {
+        final settings = await SettingsService.getInstance();
+        _linuxEmbedMode = settings.read(SettingsService.linuxHdrPassthrough);
+        result = await invoke<Object>('initialize', {'embed': _linuxEmbedMode});
+      } else {
+        result = await invoke<Object>('initialize');
+      }
       final bool ok;
       if (result is int) {
-        // Linux: initialize returns the texture ID
-        _textureIdValue = result;
-        ok = true;
+        if (Platform.isLinux && _linuxEmbedMode) {
+          ok = result == -1;
+        } else {
+          // Linux texture path and other platforms returning texture id
+          _textureIdValue = result;
+          ok = true;
+        }
       } else {
         ok = result == true;
       }

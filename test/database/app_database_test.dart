@@ -1,13 +1,13 @@
 import 'dart:io';
-import 'package:plezy/media/ids.dart';
+import 'package:emby_player/media/ids.dart';
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:plezy/database/app_database.dart';
-import 'package:plezy/database/download_operations.dart';
-import 'package:plezy/models/download_models.dart';
+import 'package:emby_player/database/app_database.dart';
+import 'package:emby_player/database/download_operations.dart';
+import 'package:emby_player/models/download_models.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 void main() {

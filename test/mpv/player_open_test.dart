@@ -4,10 +4,10 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/mpv/mpv.dart';
-import 'package:plezy/mpv/player/platform/player_android.dart';
-import 'package:plezy/mpv/player/player_native.dart';
-import 'package:plezy/services/settings_service.dart';
+import 'package:emby_player/mpv/mpv.dart';
+import 'package:emby_player/mpv/player/platform/player_android.dart';
+import 'package:emby_player/mpv/player/player_native.dart';
+import 'package:emby_player/services/settings_service.dart';
 
 import '../test_helpers/prefs.dart';
 

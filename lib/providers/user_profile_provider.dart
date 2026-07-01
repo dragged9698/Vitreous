@@ -12,7 +12,7 @@ import '../profiles/active_profile_provider.dart';
 import '../profiles/profile.dart';
 import '../profiles/profile_connection.dart';
 import '../profiles/profile_connection_registry.dart';
-import '../services/jellyfin_client.dart';
+import '../services/emby_client.dart';
 import '../services/multi_server_manager.dart';
 import '../services/plex_auth_service.dart';
 import '../services/storage_service.dart';
@@ -153,7 +153,7 @@ class UserProfileProvider extends ChangeNotifier with DisposableChangeNotifierMi
     final settingsConnection = await _resolveActiveSettingsConnection();
     final connection = settingsConnection?.connection;
     if (connection is JellyfinConnection) {
-      final jellyfinClient = _resolveJellyfinClient(connection);
+      final jellyfinClient = _resolveEmbyClient(connection);
       if (jellyfinClient == null) {
         appLogger.d('UserProfileProvider: default Jellyfin client unavailable, skipping settings refresh');
         return;
@@ -182,11 +182,11 @@ class UserProfileProvider extends ChangeNotifier with DisposableChangeNotifierMi
     }
   }
 
-  JellyfinClient? _resolveJellyfinClient(JellyfinConnection conn) {
+  EmbyClient? _resolveEmbyClient(JellyfinConnection conn) {
     final manager = _serverManager;
     if (manager == null) return null;
     final client = manager.getClient(ServerId(conn.serverMachineId));
-    return client is JellyfinClient ? client : null;
+    return client is EmbyClient ? client : null;
   }
 
   /// Resolve the *active Home user's* plex.tv token, in priority order:

@@ -47,8 +47,8 @@ class MediaServerTimeouts {
   /// Probe + token-validate timeout — Jellyfin servers respond fast on
   /// `/System/Info/Public` and `/Users/Me`.
   static const jellyfinProbe = Duration(seconds: 8);
+  static const embyProbe = jellyfinProbe;
 
-  /// Best-effort `/Sessions/Logout` timeout — short because the call is
-  /// fire-and-forget; the token is removed locally regardless.
   static const jellyfinSignOut = Duration(seconds: 5);
+  static const embySignOut = jellyfinSignOut;
 }

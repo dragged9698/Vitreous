@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/media_backend.dart';
-import 'package:plezy/media/media_kind.dart';
-import 'package:plezy/media/media_library.dart';
-import 'package:plezy/screens/libraries/library_browse_grouping.dart';
+import 'package:emby_player/media/media_backend.dart';
+import 'package:emby_player/media/media_kind.dart';
+import 'package:emby_player/media/media_library.dart';
+import 'package:emby_player/screens/libraries/library_browse_grouping.dart';
 
 MediaLibrary _library({required MediaKind kind, bool isShared = false}) {
   return MediaLibrary(
@@ -48,6 +48,25 @@ void main() {
         browseGroupingSeasons,
         browseGroupingEpisodes,
       ]);
+    });
+    test('mixed libraries expose shows, movies, episodes, and folders', () {
+      final library = _library(kind: MediaKind.mixed);
+
+      expect(libraryBrowseGroupingOptions(library, canGroupByFolders: false), const [
+        browseGroupingAll,
+        browseGroupingShows,
+        browseGroupingMovies,
+        browseGroupingEpisodes,
+      ]);
+      expect(libraryBrowseGroupingOptions(library, canGroupByFolders: true), const [
+        browseGroupingAll,
+        browseGroupingShows,
+        browseGroupingMovies,
+        browseGroupingEpisodes,
+        browseGroupingFolders,
+      ]);
+      expect(defaultLibraryBrowseGrouping(library), browseGroupingAll);
+      expect(normalizeLibraryBrowseGrouping(library, null, canGroupByFolders: true), browseGroupingAll);
     });
   });
 

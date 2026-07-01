@@ -23,7 +23,7 @@ const _HubRetryPolicy _continueWatchingRetry = (
 
 List<Map<String, dynamic>> _itemsArray(Object? data) {
   if (data is Map<String, dynamic>) {
-    final items = data['Items'];
+    final items = data['Items'] ?? data['items'] ?? data['Programs'] ?? data['programs'];
     if (items is List) return items.whereType<Map<String, dynamic>>().toList();
   }
   if (data is List) return data.whereType<Map<String, dynamic>>().toList();
@@ -116,7 +116,7 @@ int _fallbackPageTotal({required int offset, required int itemCount, int? reques
 
 /// `/Items/Filters` is a legacy unpaged endpoint; keep failures isolated from
 /// the paged Browse tab so very large libraries can still open.
-const _filtersTimeout = Duration(seconds: 8);
+const _filtersTimeout = Duration(seconds: 30);
 
 /// Full field set for the detail screen and the resume / next-up
 /// pre-fetch paths. Mirrors what the Jellyfin web detail view requests.
@@ -159,7 +159,7 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
     return items
         .where((view) {
           final ct = (view['CollectionType'] as String?)?.toLowerCase();
-          return ct != 'boxsets' && ct != 'playlists';
+          return ct != 'boxsets' && ct != 'playlists' && ct != 'livetv';
         })
         .map((view) => JellyfinMappers.library(view, serverId: serverId, serverName: serverName))
         .whereType<MediaLibrary>()
@@ -199,7 +199,7 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
   /// prefixed `jellyfin:` so FiltersBottomSheet can recognise it as cached and
   /// skip the per-category value fetch.
   @override
-  Future<LibraryFilterResult> fetchLibraryFiltersWithValues(String libraryId) async {
+  Future<LibraryFilterResult> fetchLibraryFiltersWithValues(String libraryId, {MediaKind? libraryKind}) async {
     final filters = <MediaFilter>[
       MediaFilter(
         filter: 'unwatched',
@@ -209,7 +209,7 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
         type: 'filter',
       ),
     ];
-    final data = await _safeFetchFilterPayload(libraryId);
+    final data = await _safeFetchFilterPayload(libraryId, libraryKind: libraryKind);
     if (data == null) return LibraryFilterResult(filters: filters, cachedValues: const {});
     List<String> stringList(Object? raw) {
       if (raw is! List) return const [];
@@ -217,11 +217,11 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
     }
 
     final raw = <String, List<String>>{
-      'genre': stringList(data['Genres']),
-      'contentRating': stringList(data['OfficialRatings']),
-      'tag': stringList(data['Tags']),
-      'year': (data['Years'] is List)
-          ? (data['Years'] as List).whereType<num>().map((y) => y.toInt().toString()).toList()
+      'genre': stringList(data['Genres'] ?? data['genres']),
+      'contentRating': stringList(data['OfficialRatings'] ?? data['officialRatings']),
+      'tag': stringList(data['Tags'] ?? data['tags']),
+      'year': (data['Years'] ?? data['years'] is List)
+          ? ((data['Years'] ?? data['years']) as List).whereType<num>().map((y) => y.toInt().toString()).toList()
           : const <String>[],
     };
 
@@ -250,17 +250,26 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
     return LibraryFilterResult(filters: filters, cachedValues: values);
   }
 
-  Future<Map<String, dynamic>?> _safeFetchFilterPayload(String libraryId) async {
+  Future<Map<String, dynamic>?> _safeFetchFilterPayload(String libraryId, {MediaKind? libraryKind}) async {
     try {
       final response = await _http.get(
         '/Items/Filters',
-        queryParameters: {'userId': connection.userId, 'ParentId': libraryId},
+        queryParameters: {
+          'userId': connection.userId,
+          'ParentId': libraryId,
+          'Recursive': 'true',
+          'IncludeItemTypes': JellyfinLibraryQueryTranslator.includeItemTypesFor(libraryKind),
+        },
         timeout: _filtersTimeout,
       );
       throwIfHttpError(response);
       final data = response.data;
       return data is Map<String, dynamic> ? data : null;
     } on MediaServerHttpException catch (e, st) {
+      if (e.statusCode == 404) {
+        appLogger.d('JellyfinClient: /Items/Filters not available on this server (filters disabled)');
+        return null;
+      }
       if (!e.isTransient) rethrow;
       appLogger.w('JellyfinClient: /Items/Filters timed out (filters disabled)', error: e, stackTrace: st);
       return null;
@@ -1182,6 +1191,7 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
       'Limit': limit.toString(),
       'ParentId': libraryId,
       'Fields': _browseFields,
+      if (libraryKind == MediaKind.mixed) 'IncludeItemTypes': 'Movie,Series',
       ...jellyfinImageQueryParameters,
     }, retry: _libraryHubRetry);
 
@@ -1201,7 +1211,7 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
       ].where((h) => h.items.isNotEmpty).toList();
     }
 
-    final includeNextUp = libraryKind == null || libraryKind == MediaKind.show;
+    final includeNextUp = libraryKind == null || libraryKind == MediaKind.show || libraryKind == MediaKind.mixed;
     final results = await Future.wait([
       latestFuture,
       _safeFetchItemsArray('/UserItems/Resume', {
@@ -1304,7 +1314,8 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
           {
             'Limit': effectiveLimit,
             'Fields': _browseFields,
-            if (parentId != null) 'ParentId': parentId else 'IncludeItemTypes': 'Movie,Series,Episode',
+            if (parentId != null) 'ParentId': parentId,
+            'IncludeItemTypes': parentId != null ? 'Movie,Series' : 'Movie,Series,Episode',
             ...jellyfinImageQueryParameters,
           },
           offset: offset,
@@ -1423,11 +1434,11 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
     if (isOfflineMode) return const [];
 
     final results = await Future.wait([
-      _safeFetchItemsArray('/Items/${_segment(id)}/LocalTrailers', {
+      _fetchOptionalExtrasItems('/Items/${_segment(id)}/LocalTrailers', {
         'userId': connection.userId,
         ...jellyfinImageQueryParameters,
       }),
-      _safeFetchItemsArray('/Items/${_segment(id)}/SpecialFeatures', {
+      _fetchOptionalExtrasItems('/Items/${_segment(id)}/SpecialFeatures', {
         'userId': connection.userId,
         ...jellyfinImageQueryParameters,
       }),
@@ -1592,6 +1603,28 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
       return _itemsArray(data);
     } catch (e, st) {
       appLogger.w('JellyfinClient: $path failed (treating as empty)', error: e, stackTrace: st);
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchOptionalExtrasItems(
+    String path,
+    Map<String, dynamic> queryParameters,
+  ) async {
+    try {
+      final response = await _getItemsResponse(path, queryParameters, null);
+      throwIfHttpError(response);
+      final data = response.data;
+      if (data is List) {
+        return data.whereType<Map<String, dynamic>>().toList();
+      }
+      return _itemsArray(data);
+    } on MediaServerHttpException catch (e) {
+      if (e.statusCode == 404) return const [];
+      appLogger.d('JellyfinClient: $path failed (treating as empty)', error: e);
+      return const [];
+    } catch (e, st) {
+      appLogger.d('JellyfinClient: $path failed (treating as empty)', error: e, stackTrace: st);
       return const [];
     }
   }

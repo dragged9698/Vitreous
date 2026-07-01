@@ -258,6 +258,9 @@ class JellyfinLibraryQueryTranslator implements LibraryQueryTranslator {
     return params;
   }
 
+  /// Item types for `/Items` and `/Items/Filters` scoped to a library browse kind.
+  static String includeItemTypesFor(MediaKind? kind) => _includeTypesFor(kind);
+
   static String _includeTypesFor(MediaKind? kind) {
     return switch (kind) {
       MediaKind.movie => 'Movie',
@@ -271,7 +274,9 @@ class JellyfinLibraryQueryTranslator implements LibraryQueryTranslator {
       MediaKind.playlist => 'Playlist',
       MediaKind.clip => 'Video,MusicVideo',
       MediaKind.photo => 'Photo',
-      _ => 'Movie,Series,Episode,Audio',
+      MediaKind.mixed => 'Movie,Series',
+      MediaKind.unknown => 'Movie,Series',
+      _ => 'Movie,Series',
     };
   }
 

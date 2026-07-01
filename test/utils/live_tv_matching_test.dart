@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/models/livetv_channel.dart';
-import 'package:plezy/models/livetv_program.dart';
-import 'package:plezy/utils/live_tv_matching.dart';
+import 'package:emby_player/models/livetv_channel.dart';
+import 'package:emby_player/models/livetv_program.dart';
+import 'package:emby_player/utils/live_tv_matching.dart';
 
 void main() {
   test('matches channel by id and server', () {
@@ -35,5 +35,33 @@ void main() {
 
     expect(liveTvProgramMatchesChannel(program, matching), isTrue);
     expect(liveTvProgramMatchesChannel(program, otherProvider), isFalse);
+  });
+
+  test('matches channel ids case-insensitively', () {
+    final program = LiveTvProgram(
+      title: 'News',
+      channelIdentifier: 'ABCD1234EFGH5678IJKL9012MNOP3456',
+      serverId: 'server-a',
+    );
+    final channel = LiveTvChannel(
+      key: 'abcd1234efgh5678ijkl9012mnop3456',
+      serverId: 'server-a',
+    );
+
+    expect(liveTvProgramMatchesChannel(program, channel), isTrue);
+  });
+
+  test('matches channel ids with brace and dash formatting', () {
+    final program = LiveTvProgram(
+      title: 'News',
+      channelIdentifier: '{ABCD1234-EFGH-5678-IJKL-9012MNOP3456}',
+      serverId: 'server-a',
+    );
+    final channel = LiveTvChannel(
+      key: 'abcd1234efgh5678ijkl9012mnop3456',
+      serverId: 'server-a',
+    );
+
+    expect(liveTvProgramMatchesChannel(program, channel), isTrue);
   });
 }

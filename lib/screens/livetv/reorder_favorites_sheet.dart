@@ -13,8 +13,8 @@ import '../../models/livetv_channel.dart';
 import '../../providers/multi_server_provider.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/bottom_sheet_header.dart';
+import '../../widgets/live_tv_channel_logo.dart';
 import '../../widgets/overlay_sheet.dart';
-import '../../widgets/optimized_media_image.dart';
 
 class ReorderFavoritesSheet extends StatefulWidget {
   final List<FavoriteChannel> favorites;
@@ -302,12 +302,11 @@ class _ReorderFavoritesSheetState extends State<ReorderFavoritesSheet> {
             width: 40,
             height: 40,
             child: channel?.thumb != null && client != null
-                ? OptimizedMediaImage.thumb(
+                ? LiveTvChannelLogo(
                     client: client,
-                    imagePath: channel!.thumb,
+                    imagePath: channel!.thumb!,
                     width: 40,
                     height: 40,
-                    fit: BoxFit.contain,
                   )
                 : Center(child: AppIcon(Symbols.live_tv_rounded, fill: 1, color: colorScheme.onSurfaceVariant)),
           ),

@@ -37,11 +37,15 @@ class MpvPlayer {
   MpvPlayer();
   ~MpvPlayer();
 
-  /// Initializes the mpv instance and configures options.
+  /// Initializes the mpv instance for Flutter texture rendering (SDR tonemap path).
   /// Does NOT create the render context — call InitRenderContext() later
   /// when an OpenGL context is available.
   /// @return true if initialization succeeded.
   bool Initialize();
+
+  /// Initializes mpv with gpu-next embedded in a transient GTK window for HDR
+  /// passthrough (Vulkan/Wayland when available). No Flutter texture is used.
+  bool InitializeEmbed(GtkWidget* flutter_view);
 
   /// Creates the mpv OpenGL render context.
   /// Must be called with a valid GL context current (e.g., from FlTextureGL::populate).
@@ -61,7 +65,10 @@ class MpvPlayer {
   void Dispose();
 
   /// Returns true if mpv is initialized (has both mpv handle and render context).
-  bool IsInitialized() const { return mpv_ != nullptr && mpv_gl_ != nullptr; }
+  bool IsInitialized() const {
+    if (embed_mode_) return mpv_ != nullptr && embed_video_ != nullptr;
+    return mpv_ != nullptr && mpv_gl_ != nullptr;
+  }
 
   /// Returns true if this player has been disposed.
   bool IsDisposed() const { return disposed_.load(); }
@@ -113,7 +120,21 @@ class MpvPlayer {
   /// Sets the MPV log message level (e.g., "warn", "v", "debug").
   void SetLogLevel(const std::string& level);
 
+  /// Position the embedded video surface (HDR passthrough mode only).
+  void SetVideoRect(int left, int top, int right, int bottom, double device_pixel_ratio);
+
+  /// Show or hide the embedded video surface.
+  void SetVisible(bool visible);
+
+  bool UsesEmbed() const { return embed_mode_; }
+
+  /// Toggle KDE/GTK "keep above others" on the HDR embed popup window.
+  void SetEmbedKeepAbove(bool keep_above);
+
  private:
+  void ApplyToneMappingFallback();
+  void SetHDREnabled(bool enabled, StatusCallback callback = nullptr);
+  int64_t EmbedWindowId(GtkWidget* widget);
   /// MPV event wakeup callback (called from mpv thread).
   static void OnMpvWakeup(void* ctx);
 
@@ -142,6 +163,13 @@ class MpvPlayer {
 
   mpv_handle* mpv_ = nullptr;
   mpv_render_context* mpv_gl_ = nullptr;
+
+  bool embed_mode_ = false;
+  bool embed_keep_above_ = false;
+  bool hdr_enabled_ = false;
+  GtkWindow* embed_window_ = nullptr;
+  GtkWidget* embed_video_ = nullptr;
+  GtkWidget* flutter_view_ = nullptr;
 
   // Isolated EGL context for mpv rendering (not shared with Flutter)
   EGLDisplay egl_display_ = EGL_NO_DISPLAY;

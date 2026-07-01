@@ -199,23 +199,26 @@ mixin _JellyfinPlaybackMethods on MediaServerCacheMixin {
 
         final transcodingUrl = chosenSource['TranscodingUrl'];
         final directStreamUrl = chosenSource['DirectStreamUrl'];
+        final supportsDirectStream = embySourceSupportsDirectStream(chosenSource);
+        final staticStream = embySourcePrefersStaticStream(chosenSource);
         if (!preset.isOriginal && transcodingUrl is String && transcodingUrl.isNotEmpty) {
-          // TranscodingUrl is server-relative and already encodes container,
-          // codecs, MediaSourceId, and PlaySessionId; we just append the
-          // api_key for auth.
           capturePlaySessionId(transcodingUrl);
           videoUrl = _withApiKey(transcodingUrl);
           playMethod = 'Transcode';
           isTranscoding = true;
           includeExternalSubtitleDelivery = true;
-        } else if (directStreamUrl is String && directStreamUrl.isNotEmpty) {
+        } else if (supportsDirectStream && directStreamUrl is String && directStreamUrl.isNotEmpty) {
           capturePlaySessionId(directStreamUrl);
-          videoUrl = _withApiKey(directStreamUrl);
+          videoUrl = _withApiKey(sanitizeMediaBrowserDirectStreamUrl(directStreamUrl, staticStream: staticStream));
           playMethod = 'DirectStream';
-        } else {
-          if (!preset.isOriginal) {
-            fallbackReason = TranscodeFallbackReason.directPlayOnly;
-          }
+        } else if (transcodingUrl is String && transcodingUrl.isNotEmpty) {
+          capturePlaySessionId(transcodingUrl);
+          videoUrl = _withApiKey(transcodingUrl);
+          playMethod = 'Transcode';
+          isTranscoding = true;
+          includeExternalSubtitleDelivery = true;
+        } else if (!preset.isOriginal) {
+          fallbackReason = TranscodeFallbackReason.directPlayOnly;
         }
       } else if (!preset.isOriginal) {
         fallbackReason = TranscodeFallbackReason.directPlayOnly;
@@ -231,7 +234,38 @@ mixin _JellyfinPlaybackMethods on MediaServerCacheMixin {
       includeExternalDelivery: includeExternalSubtitleDelivery,
     );
     final pinnedSourceId = bundle.pinnedSourceIdForItem(metadata.id);
-    videoUrl ??= buildDirectStreamUrl(metadata.id, container: effectiveContainer, mediaSourceId: pinnedSourceId);
+    if (videoUrl == null && embySourceSupportsDirectStream(bundle.selectedSource)) {
+      videoUrl = buildDirectStreamUrl(
+        metadata.id,
+        container: effectiveContainer,
+        mediaSourceId: pinnedSourceId ?? bundle.selectedSourceId,
+        playSessionId: playSessionId,
+        staticStream: embySourcePrefersStaticStream(bundle.selectedSource),
+      );
+      playMethod = 'DirectStream';
+    } else if (videoUrl == null && embySourceNeedsTranscode(bundle.selectedSource)) {
+      final forced = await getPlaybackInfo(
+        metadata.id,
+        maxStreamingBitrate: maxStreamingBitrate,
+        mediaSourceId: bundle.selectedSourceId,
+        startTimeTicks: transcodeStartTimeTicks,
+        audioStreamIndex: requestedAudioStreamId,
+        enableDirectPlay: false,
+        enableDirectStream: false,
+        enableTranscoding: true,
+      );
+      final forcedSource = forced == null
+          ? null
+          : _selectNegotiatedMediaSource(forced['MediaSources'], bundle.selectedSourceId);
+      final forcedUrl = forcedSource?['TranscodingUrl'];
+      if (forcedUrl is String && forcedUrl.isNotEmpty) {
+        playSessionId = forced?['PlaySessionId'] as String?;
+        videoUrl = _withApiKey(forcedUrl);
+        playMethod = 'Transcode';
+        isTranscoding = true;
+        includeExternalSubtitleDelivery = true;
+      }
+    }
 
     return PlaybackInitializationResult(
       availableVersions: bundle.availableVersions,
@@ -405,6 +439,7 @@ mixin _JellyfinPlaybackMethods on MediaServerCacheMixin {
     String? playSessionId,
     String? liveStreamId,
     int? audioStreamIndex,
+    bool staticStream = true,
   }) {
     return buildJellyfinDirectStreamUrl(
       baseUrl: connection.baseUrl,
@@ -416,6 +451,7 @@ mixin _JellyfinPlaybackMethods on MediaServerCacheMixin {
       playSessionId: playSessionId,
       liveStreamId: liveStreamId,
       audioStreamIndex: audioStreamIndex,
+      staticStream: staticStream,
     );
   }
 
@@ -562,11 +598,9 @@ mixin _JellyfinPlaybackMethods on MediaServerCacheMixin {
     return const ExternalIds();
   }
 
-  /// Jellyfin embeds the access token in the URL query string (`api_key=...`)
-  /// rather than relying on headers, so the player needs no extra headers
-  /// for direct streams.
+  /// MPV opens streams outside [FailoverHttpClient]; mirror API auth headers.
   @override
-  Map<String, String> get streamHeaders => const {};
+  Map<String, String> get streamHeaders => mediaBrowserStreamHeaders(_http.defaultHeaders);
 
   /// Tell the server the user has started playing [itemId]. Body shape
   /// mirrors the Jellyfin SDK's [PlaybackStartInfo] — Findroid sends the

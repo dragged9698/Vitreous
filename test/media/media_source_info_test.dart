@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plezy/media/media_source_info.dart';
-import 'package:plezy/utils/track_label_builder.dart';
+import 'package:emby_player/media/media_source_info.dart';
+import 'package:emby_player/utils/track_label_builder.dart';
 
 void main() {
   group('MediaSubtitleTrack label', () {

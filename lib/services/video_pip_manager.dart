@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../mpv/mpv.dart';
 import '../services/pip_service.dart';
+import '../services/desktop_pip_service.dart';
 import '../utils/app_logger.dart';
 
 class VideoPIPManager {
@@ -64,13 +65,17 @@ class VideoPIPManager {
 
     // If PiP is already active, exit it
     if (isPipActive.value) {
-      await PipService.exit();
+      if (DesktopPipService.isSupported) {
+        await DesktopPipService.exit();
+      } else {
+        await PipService.exit();
+      }
       return (true, null);
     }
 
     // Reset video filter to contain mode before entering PiP. Android, iOS,
-    // and macOS all reuse the inline video surface/layer for PiP.
-    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+    // macOS, and desktop floating-window PiP reuse the inline video surface.
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS || DesktopPipService.isSupported) {
       onBeforeEnterPip?.call();
       // Wait a frame for the filter change to take effect
       await Future.delayed(const Duration(milliseconds: 50));

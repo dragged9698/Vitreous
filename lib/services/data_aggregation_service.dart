@@ -114,7 +114,7 @@ class DataAggregationService {
     }
 
     // Sort by most recently viewed, falling back to addedAt for unwatched items.
-    // Same key as JellyfinClient's continue-watching merge (MediaItem.recencySortKey)
+    // Same key as EmbyClient's continue-watching merge (MediaItem.recencySortKey)
     // so per-server and cross-server ordering can't drift apart.
     filteredOnDeck.sort((a, b) => b.recencySortKey.compareTo(a.recencySortKey));
 

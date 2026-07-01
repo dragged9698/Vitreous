@@ -70,7 +70,7 @@ abstract class MediaListPlaybackLauncher {
   /// [MediaItem.backend] / [MediaPlaylist.backend].
   static MediaListPlaybackLauncher forItem(BuildContext context, Object item) {
     final backend = _backendOf(item);
-    if (backend == MediaBackend.jellyfin) {
+    if (backend == MediaBackend.emby) {
       return JellyfinSequentialLauncher(context: context);
     }
     return PlexPlayQueueLauncher.forContext(context, item);

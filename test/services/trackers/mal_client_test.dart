@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:plezy/services/trackers/mal/mal_auth_service.dart';
-import 'package:plezy/services/trackers/mal/mal_client.dart';
-import 'package:plezy/services/trackers/tracker_exceptions.dart';
-import 'package:plezy/services/trackers/tracker_session.dart';
+import 'package:emby_player/services/trackers/mal/mal_auth_service.dart';
+import 'package:emby_player/services/trackers/mal/mal_client.dart';
+import 'package:emby_player/services/trackers/tracker_exceptions.dart';
+import 'package:emby_player/services/trackers/tracker_session.dart';
 
 TrackerSession _session() {
   final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;

@@ -60,7 +60,7 @@ class OfflineWatchSyncService extends ChangeNotifier {
     if (client is PlexClient && client.serverPrefs.isNotEmpty) {
       return client.watchedThreshold;
     }
-    if (client != null && client.backend != MediaBackend.plex) {
+    if (client != null && client.backend != MediaBackend.emby) {
       // Jellyfin (and any future neutral backend) — the client exposes a
       // fixed threshold that mirrors the wire-protocol behaviour.
       return client.watchedThreshold;
@@ -432,12 +432,12 @@ class OfflineWatchSyncService extends ChangeNotifier {
   Future<({MediaServerClient client, String? clientScopeId})?> _clientForAction(OfflineWatchProgressItem action) async {
     final scopeId = action.clientScopeId;
     if (scopeId != null && scopeId.isNotEmpty) {
-      final scoped = _serverManager.getJellyfinClientByCompoundId(scopeId);
+      final scoped = _serverManager.getEmbyClientByCompoundId(scopeId);
       if (scoped != null) return (client: scoped, clientScopeId: scopeId);
     }
     final client = _serverManager.getClient(ServerId(action.serverId));
     if (client == null) return null;
-    if (client.backend == MediaBackend.jellyfin && client.cacheServerId != action.serverId) {
+    if (client.backend == MediaBackend.emby && client.cacheServerId != action.serverId) {
       appLogger.w(
         'Refusing to sync unscoped Jellyfin action ${action.id} for ${action.serverId}:${action.ratingKey}; '
         'no queued client scope is available',
@@ -490,7 +490,7 @@ class OfflineWatchSyncService extends ChangeNotifier {
 
   Future<MediaServerClient?> _clientForDownloadScope(ServerId serverId, String? clientScopeId) async {
     if (clientScopeId != null && clientScopeId.isNotEmpty) {
-      final scoped = _serverManager.getJellyfinClientByCompoundId(clientScopeId);
+      final scoped = _serverManager.getEmbyClientByCompoundId(clientScopeId);
       if (scoped != null) return scoped;
     }
     return _serverManager.getClient(serverId);
@@ -567,7 +567,7 @@ class OfflineWatchSyncService extends ChangeNotifier {
           final position = action.shouldMarkWatched && duration != null
               ? duration
               : Duration(milliseconds: action.viewOffset!);
-          if (!action.shouldMarkWatched || client.backend != MediaBackend.plex) {
+          if (!action.shouldMarkWatched || client.backend != MediaBackend.emby) {
             try {
               await client.reportPlaybackStarted(itemId: action.ratingKey, position: position, duration: duration);
             } catch (e) {

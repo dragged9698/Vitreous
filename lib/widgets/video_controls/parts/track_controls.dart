@@ -89,7 +89,7 @@ extension _PlexVideoControlsTrackMethods on _PlexVideoControlsState {
       selectedSubtitleStreamId: widget.selectedSubtitleStreamId,
     );
     final canSwitchSourceSubtitles =
-        versionQuality.canSwitch && versionQuality.isTranscoding && widget.metadata.backend == MediaBackend.plex;
+        versionQuality.canSwitch && versionQuality.isTranscoding && widget.metadata.backend == MediaBackend.emby;
     return TrackControlsState(
       availableVersions: versionQuality.availableVersions,
       selectedMediaIndex: widget.selectedMediaIndex,
@@ -148,6 +148,7 @@ extension _PlexVideoControlsTrackMethods on _PlexVideoControlsState {
       onQueueItemSelected: playbackState.isQueueActive ? _onQueueItemSelected : null,
       ratingKey: widget.metadata.id,
       mediaTitle: widget.metadata.title,
+      playbackMetadata: widget.metadata,
       onSubtitleDownloaded: _onSubtitleDownloaded,
       // Plex proxies OpenSubtitles via its server-side plugin; Jellyfin
       // doesn't expose an equivalent so the Search Subtitles tile is hidden
