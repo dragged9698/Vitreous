@@ -19,6 +19,7 @@ import '../services/settings_service.dart';
 import 'settings_builder.dart';
 import 'watched_indicator.dart';
 import '../utils/content_utils.dart';
+import '../utils/platform_detector.dart';
 import '../utils/provider_extensions.dart';
 import '../utils/formatters.dart';
 import '../utils/media_navigation_helper.dart';
@@ -297,9 +298,7 @@ class MediaCardState extends State<MediaCard> with ContextMenuTapMixin<MediaCard
     return SizedBox(
       width: width,
       height: height,
-      child: InkWell(
-        mouseCursor: SystemMouseCursors.click,
-        canRequestFocus: false,
+      child: _CardTapRegion(
         onTap: () => _handleTap(context, item),
         onTapDown: storeTapPosition,
         onLongPress: showContextMenuFromTap,
@@ -369,9 +368,7 @@ class MediaCardState extends State<MediaCard> with ContextMenuTapMixin<MediaCard
 
     return SizedBox(
       width: widget.width,
-      child: InkWell(
-        mouseCursor: SystemMouseCursors.click,
-        canRequestFocus: false,
+      child: _CardTapRegion(
         onTap: () => _handleTap(context, item),
         onTapDown: storeTapPosition,
         onLongPress: showContextMenuFromTap,
@@ -601,9 +598,7 @@ class _MediaCardList extends StatelessWidget {
     return CardFocusBorder(
       borderRadius: tokens(context).radiusSm,
       strokeAlign: BorderSide.strokeAlignInside,
-      child: InkWell(
-        mouseCursor: SystemMouseCursors.click,
-        canRequestFocus: false, // Keyboard handled by FocusableMediaCard
+      child: _CardTapRegion(
         onTap: onTap,
         onTapDown: onTapDown,
         onLongPress: onLongPress,
@@ -991,6 +986,59 @@ class SkeletonLoader extends StatelessWidget {
         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.075),
         borderRadius: borderRadius ?? BorderRadius.circular(tokens(context).radiusSm),
       ),
+      child: child,
+    );
+  }
+}
+
+/// Tap surface for a card: a full [InkWell] (ripple, hover, cursor) on
+/// desktop where hover feedback matters, a bare [GestureDetector] on TV and
+/// touch handhelds — the ripple is invisible under poster art and the
+/// per-card ink/hover/focus machinery (~15 elements each) is dead weight
+/// that adds up while scrolling card grids.
+/// Keyboard focus is handled by the focus wrappers either way
+/// (canRequestFocus stays false on the InkWell).
+class _CardTapRegion extends StatelessWidget {
+  const _CardTapRegion({
+    required this.onTap,
+    this.onTapDown,
+    this.onLongPress,
+    this.onSecondaryTap,
+    this.onSecondaryTapDown,
+    this.borderRadius,
+    required this.child,
+  });
+
+  final VoidCallback onTap;
+  final GestureTapDownCallback? onTapDown;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onSecondaryTap;
+  final GestureTapDownCallback? onSecondaryTapDown;
+  final BorderRadius? borderRadius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!PlatformDetector.isDesktopOS()) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        onTapDown: onTapDown,
+        onLongPress: onLongPress,
+        onSecondaryTap: onSecondaryTap,
+        onSecondaryTapDown: onSecondaryTapDown,
+        child: child,
+      );
+    }
+    return InkWell(
+      mouseCursor: SystemMouseCursors.click,
+      canRequestFocus: false,
+      onTap: onTap,
+      onTapDown: onTapDown,
+      onLongPress: onLongPress,
+      onSecondaryTapDown: onSecondaryTapDown,
+      onSecondaryTap: onSecondaryTap,
+      borderRadius: borderRadius,
       child: child,
     );
   }

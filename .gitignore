@@ -18,6 +18,11 @@ migrate_working_dir/
 *.iws
 .idea/
 
+# Cursor IDE (local state; project rules under .cursor/rules/ stay tracked)
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
@@ -71,3 +76,4 @@ duplication-report/
 maestro/**/*.png
 
 server/deploy.sh
+server/Caddyfile

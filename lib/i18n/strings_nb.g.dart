@@ -271,7 +271,7 @@ class _TranslationsSettingsNb extends TranslationsSettingsEn {
 	@override String get hideSpoilers => 'Skjul spoilere for usette episoder';
 	@override String get hideSpoilersDescription => 'Slør miniatyrbilder og beskrivelser for usette episoder';
 	@override String get playerBackend => 'Spillermotor';
-	@override String get exoPlayer => 'ExoPlayer (Anbefalt)';
+	@override String get exoPlayer => 'ExoPlayer';
 	@override String get mpv => 'mpv';
 	@override String get hardwareDecoding => 'Maskinvaredekoding';
 	@override String get hardwareDecodingDescription => 'Bruk maskinvareakselerasjon når tilgjengelig';
@@ -393,6 +393,30 @@ class _TranslationsSettingsNb extends TranslationsSettingsEn {
 	@override String get tunneledPlaybackDescription => 'Bruk videotunneling. Slå av hvis HDR-avspilling viser svart video.';
 	@override String get audioPassthrough => 'Lydgjennomgang';
 	@override String get audioPassthroughDescription => 'Send Dolby/DTS-lyd til mottakeren eller TV-en uten omkoding, slik at surroundlyd bevares. Slå av hvis du ikke har lyd.';
+	@override String get audioPassthroughDescriptionAppleTv => 'Overlater Dolby Digital Plus (inkl. Atmos) til systemet som bitstream. DTS og TrueHD spilles fortsatt av som flerkanals PCM. Korte lydbrudd kan forekomme ved søking.';
+	@override String get audioDownmix => 'Nedmiks til stereo';
+	@override String get audioDownmixDescription => 'Mikser surroundlyd ned til to kanaler for stereohøyttalere eller hodetelefoner';
+	@override String get downmixCenterBoost => 'Forsterkning av senterkanal';
+	@override String downmixCenterBoostValue({required Object db}) => '${db} dB';
+	@override String get downmixCenterBoostLabel => 'Forsterkning (dB)';
+	@override String get downmixCenterBoostShort => 'dB';
+	@override String get audioDownmixNormalize => 'Normaliser lydstyrke ved nedmiks';
+	@override String get audioDownmixNormalizeDescription => 'Senker miksen for å unngå klipping. Slå av for å beholde originalvolumet (høye scener kan forvrenges).';
+	@override String get atmosDiagnostics => 'Atmos-utgangstest';
+	@override String get atmosDiagnosticsDescription => 'Diagnostiser Dolby Atmos-utgangen ved å spille testsignaler gjennom systemspilleren';
+	@override String get atmosTestHlsAtmos => 'Apple Atmos-strøm';
+	@override String get atmosTestHlsAtmosDescription => 'Kjent god Dolby Atmos-strøm. Mottakeren bør vise Dolby Atmos.';
+	@override String get atmosTestHlsControl => 'Apple surround-strøm';
+	@override String get atmosTestHlsControlDescription => 'Kontrollstrøm uten Atmos. Mottakeren bør vise surround uten Atmos.';
+	@override String get atmosTestRawStream => 'Rå EAC3-strøm';
+	@override String get atmosTestRawStreamDescription => 'Strømmer testfilen akkurat som Atmos-avspilling i spilleren. Krever testfilens URL.';
+	@override String get atmosTestRawFile => 'Rå EAC3-fil';
+	@override String get atmosTestRawFileDescription => 'Spiller av testfilen med kjent lengde. Krever testfilens URL.';
+	@override String get atmosTestStop => 'Stopp test';
+	@override String get atmosTestUrl => 'Testfilens URL';
+	@override String get atmosTestUrlDescription => 'HTTP-URL til en rå .ec3 Dolby Atmos-fil (f.eks. hentet ut med ffmpeg)';
+	@override String get atmosTestUrlMissing => 'Angi testfilens URL først';
+	@override String get atmosTestStatus => 'Status';
 	@override String get dvConversionMode => 'Dolby Vision-konvertering';
 	@override String get dvConversionModeDescription => 'Velg hvordan ExoPlayer håndterer Dolby Vision Profile 7-filer.';
 	@override String get dvConversionAuto => 'Auto';
@@ -528,9 +552,6 @@ class _TranslationsRateSheetNb extends TranslationsRateSheetEn {
 	@override String starValue({required Object rating}) => '${rating} / 5';
 	@override String scoreValue({required Object score}) => '${score} / 10';
 	@override String get setScore => 'Sett en poengsum';
-	@override String get notRated => 'Ikke vurdert';
-	@override String get liked => 'Likt';
-	@override String get notLiked => 'Ikke likt';
 	@override String get saved => 'Lagret';
 	@override String get notAvailable => 'Ingen treff';
 	@override String get noConnectedTrackers => 'Koble til en sporer i Innstillinger for å vurdere der.';
@@ -829,7 +850,9 @@ class _TranslationsProfilesNb extends TranslationsProfilesEn {
 	@override String get borrowConnectionBorrowed => 'Tilkobling lånt.';
 	@override String get borrowFailed => 'Kunne ikke låne tilkoblingen.';
 	@override String get incorrectPin => 'Feil PIN.';
+	@override String get incorrectPinTryAgain => 'Feil PIN. Prøv igjen.';
 	@override String get sourceProfileMissingParentAccount => 'Kildeprofilen mangler foreldrekontoen sin.';
+	@override String get failedToLoadHomeUsers => 'Kunne ikke laste inn Plex Home-brukerne dine. Sjekk tilkoblingen og prøv igjen.';
 	@override String get failedToVerifyPin => 'Kunne ikke bekrefte PIN.';
 	@override String get newProfile => 'Ny profil';
 	@override String get profileNameHint => 'f.eks. Gjester, Barn, Familierom';
@@ -1376,6 +1399,7 @@ class _TranslationsVideoSettingsNb extends TranslationsVideoSettingsEn {
 	@override String get performanceOverlay => 'Ytelsesoverlegg';
 	@override String get audioPassthrough => 'Lydgjennomgang';
 	@override String get audioNormalization => 'Normaliser lydstyrke';
+	@override String get audioDownmix => 'Nedmiks til stereo';
 }
 
 // Path: performanceOverlay
@@ -2060,7 +2084,7 @@ extension on TranslationsNb {
 			'settings.hideSpoilers' => 'Skjul spoilere for usette episoder',
 			'settings.hideSpoilersDescription' => 'Slør miniatyrbilder og beskrivelser for usette episoder',
 			'settings.playerBackend' => 'Spillermotor',
-			'settings.exoPlayer' => 'ExoPlayer (Anbefalt)',
+			'settings.exoPlayer' => 'ExoPlayer',
 			'settings.mpv' => 'mpv',
 			'settings.hardwareDecoding' => 'Maskinvaredekoding',
 			'settings.hardwareDecodingDescription' => 'Bruk maskinvareakselerasjon når tilgjengelig',
@@ -2182,6 +2206,30 @@ extension on TranslationsNb {
 			'settings.tunneledPlaybackDescription' => 'Bruk videotunneling. Slå av hvis HDR-avspilling viser svart video.',
 			'settings.audioPassthrough' => 'Lydgjennomgang',
 			'settings.audioPassthroughDescription' => 'Send Dolby/DTS-lyd til mottakeren eller TV-en uten omkoding, slik at surroundlyd bevares. Slå av hvis du ikke har lyd.',
+			'settings.audioPassthroughDescriptionAppleTv' => 'Overlater Dolby Digital Plus (inkl. Atmos) til systemet som bitstream. DTS og TrueHD spilles fortsatt av som flerkanals PCM. Korte lydbrudd kan forekomme ved søking.',
+			'settings.audioDownmix' => 'Nedmiks til stereo',
+			'settings.audioDownmixDescription' => 'Mikser surroundlyd ned til to kanaler for stereohøyttalere eller hodetelefoner',
+			'settings.downmixCenterBoost' => 'Forsterkning av senterkanal',
+			'settings.downmixCenterBoostValue' => ({required Object db}) => '${db} dB',
+			'settings.downmixCenterBoostLabel' => 'Forsterkning (dB)',
+			'settings.downmixCenterBoostShort' => 'dB',
+			'settings.audioDownmixNormalize' => 'Normaliser lydstyrke ved nedmiks',
+			'settings.audioDownmixNormalizeDescription' => 'Senker miksen for å unngå klipping. Slå av for å beholde originalvolumet (høye scener kan forvrenges).',
+			'settings.atmosDiagnostics' => 'Atmos-utgangstest',
+			'settings.atmosDiagnosticsDescription' => 'Diagnostiser Dolby Atmos-utgangen ved å spille testsignaler gjennom systemspilleren',
+			'settings.atmosTestHlsAtmos' => 'Apple Atmos-strøm',
+			'settings.atmosTestHlsAtmosDescription' => 'Kjent god Dolby Atmos-strøm. Mottakeren bør vise Dolby Atmos.',
+			'settings.atmosTestHlsControl' => 'Apple surround-strøm',
+			'settings.atmosTestHlsControlDescription' => 'Kontrollstrøm uten Atmos. Mottakeren bør vise surround uten Atmos.',
+			'settings.atmosTestRawStream' => 'Rå EAC3-strøm',
+			'settings.atmosTestRawStreamDescription' => 'Strømmer testfilen akkurat som Atmos-avspilling i spilleren. Krever testfilens URL.',
+			'settings.atmosTestRawFile' => 'Rå EAC3-fil',
+			'settings.atmosTestRawFileDescription' => 'Spiller av testfilen med kjent lengde. Krever testfilens URL.',
+			'settings.atmosTestStop' => 'Stopp test',
+			'settings.atmosTestUrl' => 'Testfilens URL',
+			'settings.atmosTestUrlDescription' => 'HTTP-URL til en rå .ec3 Dolby Atmos-fil (f.eks. hentet ut med ffmpeg)',
+			'settings.atmosTestUrlMissing' => 'Angi testfilens URL først',
+			'settings.atmosTestStatus' => 'Status',
 			'settings.dvConversionMode' => 'Dolby Vision-konvertering',
 			'settings.dvConversionModeDescription' => 'Velg hvordan ExoPlayer håndterer Dolby Vision Profile 7-filer.',
 			'settings.dvConversionAuto' => 'Auto',
@@ -2296,9 +2344,6 @@ extension on TranslationsNb {
 			'rateSheet.starValue' => ({required Object rating}) => '${rating} / 5',
 			'rateSheet.scoreValue' => ({required Object score}) => '${score} / 10',
 			'rateSheet.setScore' => 'Sett en poengsum',
-			'rateSheet.notRated' => 'Ikke vurdert',
-			'rateSheet.liked' => 'Likt',
-			'rateSheet.notLiked' => 'Ikke likt',
 			'rateSheet.saved' => 'Lagret',
 			'rateSheet.notAvailable' => 'Ingen treff',
 			'rateSheet.noConnectedTrackers' => 'Koble til en sporer i Innstillinger for å vurdere der.',
@@ -2419,6 +2464,8 @@ extension on TranslationsNb {
 			'messages.logsCleared' => 'Logger tømt',
 			'messages.logsCopied' => 'Logger kopiert til utklippstavle',
 			'messages.noLogsAvailable' => 'Ingen logger tilgjengelig',
+			_ => null,
+		} ?? switch (path) {
 			'messages.libraryScanning' => ({required Object title}) => 'Skanner "${title}"...',
 			'messages.libraryScanStarted' => ({required Object title}) => 'Bibliotekkanning startet for "${title}"',
 			'messages.libraryScanFailed' => ({required Object error}) => 'Kunne ikke skanne bibliotek: ${error}',
@@ -2440,8 +2487,6 @@ extension on TranslationsNb {
 			'messages.serverLimitTitle' => 'Avspilling mislyktes',
 			'messages.serverLimitBody' => 'Serverfeil (HTTP 500). En båndbredde-/transkodingsgrense avviste trolig økten. Be eieren justere den.',
 			'messages.logsUploaded' => 'Logger lastet opp',
-			_ => null,
-		} ?? switch (path) {
 			'messages.logsUploadFailed' => 'Kunne ikke laste opp logger',
 			'messages.logId' => 'Logg-ID',
 			'subtitlingStyling.text' => 'Tekst',
@@ -2524,7 +2569,9 @@ extension on TranslationsNb {
 			'profiles.borrowConnectionBorrowed' => 'Tilkobling lånt.',
 			'profiles.borrowFailed' => 'Kunne ikke låne tilkoblingen.',
 			'profiles.incorrectPin' => 'Feil PIN.',
+			'profiles.incorrectPinTryAgain' => 'Feil PIN. Prøv igjen.',
 			'profiles.sourceProfileMissingParentAccount' => 'Kildeprofilen mangler foreldrekontoen sin.',
+			'profiles.failedToLoadHomeUsers' => 'Kunne ikke laste inn Plex Home-brukerne dine. Sjekk tilkoblingen og prøv igjen.',
 			'profiles.failedToVerifyPin' => 'Kunne ikke bekrefte PIN.',
 			'profiles.newProfile' => 'Ny profil',
 			'profiles.profileNameHint' => 'f.eks. Gjester, Barn, Familierom',
@@ -2931,6 +2978,8 @@ extension on TranslationsNb {
 			'companionRemote.session.startingServer' => 'Starter fjernserver...',
 			'companionRemote.session.failedToCreate' => 'Kunne ikke starte fjernserver:',
 			'companionRemote.session.hostAddress' => 'Vertsadresse',
+			_ => null,
+		} ?? switch (path) {
 			'companionRemote.session.connected' => 'Tilkoblet',
 			'companionRemote.session.serverRunning' => 'Fjernserver aktiv',
 			'companionRemote.session.serverStopped' => 'Fjernserver stoppet',
@@ -2954,8 +3003,6 @@ extension on TranslationsNb {
 			'companionRemote.pairing.connectionTimedOut' => 'Tilkoblingen fikk tidsavbrudd. Bruk samme nettverk på begge enheter.',
 			'companionRemote.pairing.sessionNotFound' => 'Enhet ikke funnet. Sørg for at Vitreous kjører på verten.',
 			'companionRemote.pairing.authFailed' => 'Autentisering mislyktes. Begge enheter må bruke samme Plex-konto.',
-			_ => null,
-		} ?? switch (path) {
 			'companionRemote.pairing.failedToConnect' => ({required Object error}) => 'Kunne ikke koble til: ${error}',
 			'companionRemote.remote.disconnectConfirm' => 'Vil du koble fra fjernøkten?',
 			'companionRemote.remote.reconnecting' => 'Kobler til på nytt...',
@@ -3000,6 +3047,7 @@ extension on TranslationsNb {
 			'videoSettings.performanceOverlay' => 'Ytelsesoverlegg',
 			'videoSettings.audioPassthrough' => 'Lydgjennomgang',
 			'videoSettings.audioNormalization' => 'Normaliser lydstyrke',
+			'videoSettings.audioDownmix' => 'Nedmiks til stereo',
 			'performanceOverlay.color' => 'Farge',
 			'performanceOverlay.performance' => 'Ytelse',
 			'performanceOverlay.buffer' => 'Buffer',

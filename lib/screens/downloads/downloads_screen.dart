@@ -463,6 +463,8 @@ class _DownloadsGridContentState extends State<_DownloadsGridContent> {
             );
 
             return GridView.builder(
+              addAutomaticKeepAlives: false,
+              addSemanticIndexes: false,
               padding: effectivePadding,
               clipBehavior: Clip.none,
               gridDelegate: MediaGridDelegate.createDelegate(

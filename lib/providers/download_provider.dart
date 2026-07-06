@@ -22,6 +22,7 @@ import '../media/media_server_client.dart';
 import '../services/sync_rule_executor.dart';
 import '../utils/app_logger.dart';
 import '../utils/deletion_notifier.dart';
+import '../utils/downloaded_version_match.dart';
 import '../media/episode_collection.dart';
 import '../utils/global_key_utils.dart';
 import '../utils/watch_state_notifier.dart';
@@ -166,10 +167,13 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
 
   bool _ownsProgressEntry(MapEntry<String, DownloadProgress> entry) => _ownsDownloadKey(entry.key);
 
-  Future<bool> _claimDownloadForActiveProfile(String globalKey) async {
-    final profileId = _requireActiveProfileId();
-    if (_ownedDownloadKeys.contains(globalKey)) return false;
+  /// Claim [globalKey] for an explicit [profileId] — sync rules claim for
+  /// the RULE'S owner, not whoever is active when the pass lands, so a
+  /// mid-run profile switch can't leak ownership across profiles.
+  Future<bool> _claimDownloadForProfile(String globalKey, String profileId) async {
+    if (_activeProfileId == profileId && _ownedDownloadKeys.contains(globalKey)) return false;
     await _database.addDownloadOwner(profileId: profileId, globalKey: globalKey);
+    // _ownedDownloadKeys mirrors only the active profile's rows.
     if (_activeProfileId != profileId) return false;
     _ownedDownloadKeys.add(globalKey);
     return true;
@@ -470,15 +474,24 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
     // (`_loadPersistedDownloads` rehydrates `_metadata` from the cache).
     if (shouldPersistToCache) {
       unawaited(
-        ApiCache.forBackend(base.backend)
-            .applyWatchState(
-              serverId: ServerId(event.cacheServerId ?? event.serverId),
-              itemId: event.itemId,
-              isWatched: isWatched,
-            )
-            .catchError((Object e) {
-              appLogger.w('Failed to apply watch state to cache for $globalKey', error: e);
-            }),
+        () async {
+          // Jellyfin cache rows are per-user (cacheServerId embeds the user);
+          // Plex rows are keyed by server only, so persisting one user's flip
+          // into a download SHARED with another profile would surface as that
+          // profile's watch state too. Skip the shared case — each profile's
+          // own queued watch actions still re-apply its state on reload.
+          if (base.backend == MediaBackend.plex &&
+              await _database.hasDownloadOwner(globalKey, excludingProfileId: _activeProfileId)) {
+            return;
+          }
+          await ApiCache.forBackend(base.backend).applyWatchState(
+            serverId: ServerId(event.cacheServerId ?? event.serverId),
+            itemId: event.itemId,
+            isWatched: isWatched,
+          );
+        }().catchError((Object e) {
+          appLogger.w('Failed to apply watch state to cache for $globalKey', error: e);
+        }),
       );
     }
     safeNotifyListeners();
@@ -814,6 +827,19 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
   /// Check if an item is currently being queued (building download queue)
   bool isQueueing(String globalKey) => _queueing.contains(globalKey);
 
+  /// Get the completed download record for an item, or null when the item
+  /// isn't fully downloaded or isn't owned by the active profile. Callers use
+  /// the row's mediaIndex/mediaSourceId to target the version actually on
+  /// disk instead of assuming the server default.
+  Future<DownloadedMediaItem?> getCompletedDownload(String globalKey) async {
+    if (!_ownsDownloadKey(globalKey)) return null;
+    final downloadedItem = await _downloadManager.getDownloadedMedia(globalKey);
+    if (downloadedItem == null || downloadedItem.status != DownloadStatus.completed.index) {
+      return null;
+    }
+    return downloadedItem;
+  }
+
   /// Get the local video file path for a downloaded item
   /// Returns null if not downloaded or file doesn't exist
   Future<String?> getVideoFilePath(String globalKey, {int? mediaIndex, String? mediaSourceId}) async {
@@ -832,22 +858,15 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
       appLogger.w('Download not complete. Status: ${downloadedItem.status}');
       return null;
     }
-    final expectedSourceId = mediaSourceId?.trim();
-    final downloadedSourceId = downloadedItem.mediaSourceId;
-    final comparedBySourceId =
-        expectedSourceId != null &&
-        expectedSourceId.isNotEmpty &&
-        downloadedSourceId != null &&
-        downloadedSourceId.isNotEmpty;
-    if (comparedBySourceId && expectedSourceId != downloadedSourceId) {
+    if (!downloadedVersionMatches(
+      downloadedItem,
+      requestedMediaIndex: mediaIndex,
+      requestedMediaSourceId: mediaSourceId,
+    )) {
       appLogger.w(
-        'Downloaded media source mismatch for $globalKey: have $downloadedSourceId, expected $expectedSourceId',
-      );
-      return null;
-    }
-    if (!comparedBySourceId && mediaIndex != null && downloadedItem.mediaIndex != mediaIndex) {
-      appLogger.w(
-        'Downloaded media index mismatch for $globalKey: have ${downloadedItem.mediaIndex}, expected $mediaIndex',
+        'Downloaded version mismatch for $globalKey: have index ${downloadedItem.mediaIndex} '
+        '(source ${downloadedItem.mediaSourceId}), expected index $mediaIndex '
+        '(source ${mediaSourceId?.trim()})',
       );
       return null;
     }
@@ -1010,21 +1029,22 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
     int mediaIndex = 0,
     DownloadVersionConfig? versionConfig,
     _RelatedMetadataDownloadContext? relatedContext,
+    String? claimForProfileId,
   }) async {
     if (!_downloadManager.downloadsSupported) return false;
 
-    _requireActiveProfileId();
+    final ownerProfileId = claimForProfileId ?? _requireActiveProfileId();
     final globalKey = metadata.globalKey;
 
     // Don't duplicate the physical download. If another profile already owns
-    // the shared row, claiming it makes it visible for the active profile.
+    // the shared row, claiming it makes it visible for the owning profile.
     if (_downloads.containsKey(globalKey)) {
       final existing = _downloads[globalKey]!;
       if (existing.status == DownloadStatus.downloading ||
           existing.status == DownloadStatus.completed ||
           existing.status == DownloadStatus.queued ||
           existing.status == DownloadStatus.paused) {
-        final claimed = await _claimDownloadForActiveProfile(globalKey);
+        final claimed = await _claimDownloadForProfile(globalKey, ownerProfileId);
         if (claimed) safeNotifyListeners();
         return claimed;
       }
@@ -1086,7 +1106,7 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
     // Store full metadata for display
     _metadata[globalKey] = metadataToStore;
 
-    await _claimDownloadForActiveProfile(globalKey);
+    await _claimDownloadForProfile(globalKey, ownerProfileId);
 
     // Update local state immediately for UI feedback
     _downloads[globalKey] = DownloadProgress(globalKey: globalKey, status: DownloadStatus.queued);
@@ -1733,8 +1753,19 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
       serverManager: serverManager,
       downloads: downloads,
       metadata: Map.unmodifiable(_metadata),
-      queueSingleDownload: (episode, client, {int mediaIndex = 0}) =>
-          _queueSingleDownload(episode, client, mediaIndex: mediaIndex, relatedContext: relatedContext),
+      queueSingleDownload: (episode, client, {int mediaIndex = 0}) async {
+        // A profile switch mid-pass must not keep queueing the old
+        // profile's rules; whatever does get queued is claimed for the
+        // rule's owner, never the new active profile.
+        if (_activeProfileId != profileId) return false;
+        return _queueSingleDownload(
+          episode,
+          client,
+          mediaIndex: mediaIndex,
+          relatedContext: relatedContext,
+          claimForProfileId: profileId,
+        );
+      },
       isOffline: _offlineSource?.isOffline ?? false,
       force: force,
     );
@@ -1761,8 +1792,16 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
       serverManager: serverManager,
       downloads: downloads,
       metadata: Map.unmodifiable(_metadata),
-      queueSingleDownload: (episode, client, {int mediaIndex = 0}) =>
-          _queueSingleDownload(episode, client, mediaIndex: mediaIndex, relatedContext: relatedContext),
+      queueSingleDownload: (episode, client, {int mediaIndex = 0}) async {
+        if (_activeProfileId != profileId) return false;
+        return _queueSingleDownload(
+          episode,
+          client,
+          mediaIndex: mediaIndex,
+          relatedContext: relatedContext,
+          claimForProfileId: profileId,
+        );
+      },
       isOffline: _offlineSource?.isOffline ?? false,
     );
   }

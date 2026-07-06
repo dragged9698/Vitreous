@@ -24,7 +24,9 @@ import '../../services/jellyfin_auth_service.dart';
 import '../../services/jellyfin_endpoint_discovery.dart';
 import '../../services/jellyfin_lan_discovery_service.dart';
 import '../../services/storage_service.dart';
+import '../../theme/mono_tokens.dart';
 import '../../utils/app_logger.dart';
+import '../../utils/device_identity.dart';
 import '../../utils/platform_detector.dart';
 import '../../widgets/focused_scroll_scaffold.dart';
 import '../profile/profile_switch_screen.dart';
@@ -435,10 +437,8 @@ class _AddJellyfinScreenState extends State<AddJellyfinScreen> with AsyncFormSta
   }
 
   Future<String> _resolveDeviceName() async {
-    // PackageInfo doesn't expose a device name; fall back to a generic label.
-    // Jellyfin only shows this in the admin "Devices" list — fine to keep
-    // simple until we add proper device_info_plus integration.
-    return 'Vitreous';
+    final identity = await DeviceIdentityService.resolve();
+    return sanitizeHeaderValue(identity.deviceName) ?? 'Vitreous';
   }
 
   @override
@@ -587,7 +587,7 @@ class _AddJellyfinScreenState extends State<AddJellyfinScreen> with AsyncFormSta
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(tokens(context).radiusMd),
       ),
       child: Row(
         children: [
@@ -649,13 +649,22 @@ class _AddJellyfinScreenState extends State<AddJellyfinScreen> with AsyncFormSta
     }
 
     if (_localServers.isEmpty) return const [];
+    final tokensRef = tokens(context);
+    // M3E connected-group geometry: large outer corners, small inner corners,
+    // hairline gaps between tiles.
+    BorderRadius radiiFor(int i) => BorderRadius.vertical(
+      top: Radius.circular(i == 0 ? tokensRef.radiusLg : tokensRef.radiusXs),
+      bottom: Radius.circular(i == _localServers.length - 1 ? tokensRef.radiusLg : tokensRef.radiusXs),
+    );
     return [
       const SizedBox(height: 16),
       Text(t.addServer.localServers, style: theme.textTheme.titleSmall),
       const SizedBox(height: 8),
-      for (final server in _localServers) ...[
+      for (final (i, server) in _localServers.indexed) ...[
+        if (i > 0) SizedBox(height: tokensRef.groupGap),
         _DiscoveredJellyfinServerTile(
           server: server,
+          borderRadius: radiiFor(i),
           focusNode: _discoveredServerFocusNodes[server.id],
           onNavigateUp: () {
             final index = _localServers.indexOf(server);
@@ -675,8 +684,8 @@ class _AddJellyfinScreenState extends State<AddJellyfinScreen> with AsyncFormSta
           },
           onTap: busy ? null : () => unawaited(_useDiscoveredServer(server)),
         ),
-        const SizedBox(height: 8),
       ],
+      const SizedBox(height: 8),
     ];
   }
 
@@ -746,6 +755,7 @@ class _AddJellyfinScreenState extends State<AddJellyfinScreen> with AsyncFormSta
 
 class _DiscoveredJellyfinServerTile extends StatelessWidget {
   final DiscoveredJellyfinServer server;
+  final BorderRadius borderRadius;
   final FocusNode? focusNode;
   final VoidCallback? onNavigateUp;
   final VoidCallback? onNavigateDown;
@@ -753,6 +763,7 @@ class _DiscoveredJellyfinServerTile extends StatelessWidget {
 
   const _DiscoveredJellyfinServerTile({
     required this.server,
+    required this.borderRadius,
     required this.focusNode,
     required this.onNavigateUp,
     required this.onNavigateDown,
@@ -772,14 +783,14 @@ class _DiscoveredJellyfinServerTile extends StatelessWidget {
       onNavigateUp: onNavigateUp,
       onNavigateDown: onNavigateDown,
       child: CardFocusBorder(
-        borderRadius: 12,
+        borderRadii: borderRadius,
         strokeAlign: BorderSide.strokeAlignInside,
         child: Material(
           color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: borderRadius,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: borderRadius,
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(

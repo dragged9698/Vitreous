@@ -52,6 +52,7 @@ import '../utils/content_utils.dart';
 import '../media/media_sort.dart';
 import '../models/plex/plex_video_playback_data.dart';
 import '../models/transcode_quality_preset.dart';
+import '../utils/device_identity.dart';
 import '../utils/failover_http_client.dart';
 import '../utils/app_logger.dart';
 import '../utils/media_server_retry.dart';
@@ -551,6 +552,8 @@ class PlexClient
     Duration timeout = const Duration(seconds: 5),
     String? clientIdentifier,
   }) async {
+    // Memoized after the first call — resolve outside the latency window.
+    final identity = await DeviceIdentityService.resolve();
     final stopwatch = Stopwatch()..start();
     MediaServerHttpClient? client;
 
@@ -561,7 +564,7 @@ class PlexClient
       if (clientIdentifier != null) {
         headers['X-Plex-Client-Identifier'] = clientIdentifier;
         headers['X-Plex-Product'] = 'Vitreous';
-        headers['X-Plex-Device-Name'] = 'Vitreous';
+        headers['X-Plex-Device-Name'] = sanitizeHeaderValue(identity.deviceName) ?? 'Vitreous';
       }
 
       final response = await client.get('/', headers: headers);
@@ -1509,12 +1512,19 @@ class PlexClient
   /// Parse video playback data from raw metadata JSON (no network call).
   /// Used by [getVideoPlaybackData] to avoid redundant fetches when the
   /// response is already available.
-  PlexVideoPlaybackData parseVideoPlaybackDataFromJson(Map<String, dynamic>? metadataJson, {int mediaIndex = 0}) {
+  PlexVideoPlaybackData parseVideoPlaybackDataFromJson(
+    Map<String, dynamic>? metadataJson, {
+    int mediaIndex = 0,
+    String? selectedMediaSourceId,
+    String? preferredVersionSignature,
+  }) {
     return parsePlexVideoPlaybackDataFromJson(
       metadataJson,
       baseUrl: config.baseUrl,
       token: config.token,
       mediaIndex: mediaIndex,
+      selectedMediaSourceId: selectedMediaSourceId,
+      preferredVersionSignature: preferredVersionSignature,
       onVersionFallback: (requested, fallback) {
         appLogger.w('Version $requested inaccessible/missing — falling back to version $fallback');
       },
@@ -1524,7 +1534,12 @@ class PlexClient
   /// Get consolidated video playback data (URL, media info, versions, and markers) in a single API call.
   /// This is the primary method for playback initialization.
   /// Uses cache for offline mode support and network fallback.
-  Future<PlexVideoPlaybackData> getVideoPlaybackData(String ratingKey, {int mediaIndex = 0}) async {
+  Future<PlexVideoPlaybackData> getVideoPlaybackData(
+    String ratingKey, {
+    int mediaIndex = 0,
+    String? selectedMediaSourceId,
+    String? preferredVersionSignature,
+  }) async {
     Map<String, dynamic>? data;
     try {
       data = await fetchWithCacheFallback<Map<String, dynamic>>(
@@ -1542,7 +1557,12 @@ class PlexClient
       // Gracefully degrade: return empty playback data on total failure
     }
     final metadataJson = _getFirstMetadataJsonFromData(data);
-    return parseVideoPlaybackDataFromJson(metadataJson, mediaIndex: mediaIndex);
+    return parseVideoPlaybackDataFromJson(
+      metadataJson,
+      mediaIndex: mediaIndex,
+      selectedMediaSourceId: selectedMediaSourceId,
+      preferredVersionSignature: preferredVersionSignature,
+    );
   }
 
   /// Get file information for a media item.
@@ -3138,6 +3158,7 @@ class PlexClient
       // [_transcodePlatformName] for the mapping.
       'X-Plex-Platform': _transcodePlatformName(),
       if (config.device != null) 'X-Plex-Device': config.device!,
+      if (config.deviceName != null) 'X-Plex-Device-Name': config.deviceName!,
       if (offsetMs != null) 'offset': (offsetMs ~/ 1000).toString(),
       if (config.token != null) 'X-Plex-Token': config.token!,
     };
@@ -3382,7 +3403,12 @@ class PlexClient
   @override
   Future<PlaybackInitializationResult> getPlaybackInitialization(PlaybackInitializationOptions options) async {
     try {
-      final data = await getVideoPlaybackData(options.metadata.id, mediaIndex: options.selectedMediaIndex);
+      final data = await getVideoPlaybackData(
+        options.metadata.id,
+        mediaIndex: options.selectedMediaIndex,
+        selectedMediaSourceId: options.selectedMediaSourceId,
+        preferredVersionSignature: options.preferredVersionSignature,
+      );
 
       if (!data.hasValidVideoUrl) {
         throw PlaybackException(t.messages.fileInfoNotAvailable);
@@ -3768,6 +3794,11 @@ class PlexClient
       queryParameters: {'key': item.id, 'identifier': 'com.plexapp.plugins.library', 'rating': rating},
     );
     throwIfHttpError(response);
+  }
+
+  @override
+  Future<void> setFavorite(MediaItem item, bool isFavorite) async {
+    throw UnsupportedError('Plex does not support user favorites.');
   }
 
   @override

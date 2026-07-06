@@ -40,7 +40,9 @@ import '../models/media_provider_info.dart';
 import '../models/media_subscription.dart';
 import '../media/media_source_info.dart';
 import '../media/media_sort.dart';
+import '../media/media_version.dart';
 import '../utils/app_logger.dart';
+import '../utils/device_identity.dart';
 import '../utils/failover_http_client.dart';
 import '../utils/media_server_retry.dart';
 import '../utils/media_server_timeouts.dart';
@@ -53,7 +55,6 @@ import '../exceptions/media_server_exceptions.dart';
 import '../i18n/strings.g.dart';
 import '../utils/jellyfin_time.dart';
 import '../utils/json_utils.dart';
-import 'device_name_service.dart';
 import 'jellyfin_auth_header.dart';
 import '../media/download_resolution.dart';
 import 'api_cache.dart';
@@ -129,11 +130,16 @@ class JellyfinClient
     } catch (_) {
       // Tests / non-platform contexts — keep the fallback version.
     }
-    final deviceName = await DeviceNameService.resolve();
+    String? deviceName;
+    try {
+      deviceName = sanitizeHeaderValue((await DeviceIdentityService.resolve()).deviceName);
+    } catch (_) {
+      // Tests / non-platform contexts — keep the fallback name.
+    }
     final authHeader = buildJellyfinAuthHeader(
       clientName: 'Vitreous',
       clientVersion: version,
-      deviceName: deviceName,
+      deviceName: deviceName ?? 'Vitreous',
       deviceId: connection.deviceId,
       accessToken: connection.accessToken,
     );

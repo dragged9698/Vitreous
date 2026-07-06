@@ -60,6 +60,7 @@ sealed class MediaItem with _$MediaItem {
     int? updatedAt,
     double? rating,
     double? userRating,
+    bool? isFavorite,
     List<String>? genres,
     List<String>? directors,
     List<String>? writers,
@@ -119,6 +120,7 @@ sealed class MediaItem with _$MediaItem {
         updatedAt: updatedAt,
         rating: rating,
         userRating: userRating,
+        isFavorite: isFavorite,
         genres: genres,
         directors: directors,
         writers: writers,
@@ -175,6 +177,7 @@ sealed class MediaItem with _$MediaItem {
         updatedAt: updatedAt,
         rating: rating,
         userRating: userRating,
+        isFavorite: isFavorite,
         genres: genres,
         directors: directors,
         writers: writers,
@@ -241,6 +244,7 @@ sealed class MediaItem with _$MediaItem {
     @JsonKey(fromJson: flexibleDouble) double? rating,
     @JsonKey(fromJson: flexibleDouble) double? audienceRating,
     @JsonKey(fromJson: flexibleDouble) double? userRating,
+    bool? isFavorite,
     String? ratingImage,
     String? audienceRatingImage,
     @JsonKey(fromJson: _mediaItemStringList) List<String>? genres,
@@ -314,6 +318,7 @@ sealed class MediaItem with _$MediaItem {
     @JsonKey(fromJson: flexibleInt) int? updatedAt,
     @JsonKey(fromJson: flexibleDouble) double? rating,
     @JsonKey(fromJson: flexibleDouble) double? userRating,
+    bool? isFavorite,
     @JsonKey(fromJson: _mediaItemStringList) List<String>? genres,
     @JsonKey(fromJson: _mediaItemStringList) List<String>? directors,
     @JsonKey(fromJson: _mediaItemStringList) List<String>? writers,
@@ -373,6 +378,19 @@ sealed class MediaItem with _$MediaItem {
   /// Global unique identifier of this item's library section.
   String? get libraryGlobalKey =>
       serverId != null && libraryId != null ? buildGlobalKey(ServerId(serverId!), libraryId!) : null;
+
+  /// Global unique identifier of this item's series, for episodes/seasons.
+  /// Null for movies and shows themselves — their own [globalKey] is already
+  /// series-level.
+  String? get seriesGlobalKey {
+    final seriesId = switch (kind) {
+      MediaKind.episode => grandparentId,
+      MediaKind.season => grandparentId ?? parentId,
+      _ => null,
+    };
+    if (seriesId == null) return null;
+    return serverId != null ? buildGlobalKey(ServerId(serverId!), seriesId) : seriesId;
+  }
 
   /// Parent rating keys for hierarchical invalidation. For an episode:
   /// `[seasonId, showId]`. For a season: `[showId]`. For a movie: `[]`.

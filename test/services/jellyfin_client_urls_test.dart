@@ -12,6 +12,7 @@ import 'package:emby_player/media/media_server_client.dart';
 import 'package:emby_player/models/transcode_quality_preset.dart';
 import 'package:emby_player/services/jellyfin_client.dart';
 import 'package:emby_player/services/playback_initialization_types.dart';
+import 'package:emby_player/utils/device_identity.dart';
 
 JellyfinConnection _conn({String accessToken = 'tok-abc', String baseUrl = 'https://jf.example.com'}) =>
     JellyfinConnection(
@@ -32,6 +33,11 @@ JellyfinConnection _conn({String accessToken = 'tok-abc', String baseUrl = 'http
 /// tests pin the contract so the next iteration of the player (Task 8 wiring)
 /// has something to point at.
 void main() {
+  // Pin device identity so JellyfinClient.create's MediaBrowser header falls
+  // back to Device="Plezy" instead of resolving the host machine's name.
+  setUpAll(() => DeviceIdentityService.debugOverride(const DeviceIdentity(platform: 'Test')));
+  tearDownAll(() => DeviceIdentityService.debugOverride(null));
+
   group('JellyfinClient URL builders', () {
     late JellyfinClient client;
 
@@ -82,6 +88,16 @@ void main() {
     test('buildDirectStreamUrl path-encodes reserved item id characters', () {
       final url = client.buildDirectStreamUrl('folder/item #1?x');
       expect(Uri.parse(url).path, '/Videos/folder%2Fitem%20%231%3Fx/stream');
+    });
+
+    test('buildDirectStreamUrl canonicalizes a mixed-case scheme from stored config', () async {
+      // This URL bypasses Dart's Uri normalization on its way to the player,
+      // and FFmpeg's protocol lookup is case-sensitive — a stored
+      // "Https://..." base URL fails with "Protocol not found" (#1465).
+      final mixedCase = await JellyfinClient.create(_conn(baseUrl: 'Https://jf.example.com/'));
+      addTearDown(mixedCase.close);
+      final url = mixedCase.buildDirectStreamUrl('item-99');
+      expect(url, startsWith('https://jf.example.com/Videos/'));
     });
 
     test('fetchSortOptions exposes the broad Jellyfin sort set', () async {
@@ -1521,8 +1537,8 @@ void main() {
       final auth = headers['Authorization'];
       expect(auth, isNotNull);
       expect(auth, startsWith('MediaBrowser '));
-      expect(auth, contains('Client="Vitreous"'));
-      expect(auth, contains('Device="Vitreous"'));
+      expect(auth, contains('Client="Plezy"'));
+      expect(auth, contains('Device="Plezy"'));
       expect(auth, contains('DeviceId="dev-xyz"'));
       expect(auth, contains(RegExp(r'Version="[^"]+"')));
       expect(auth, contains('Token="tok-abc"'));
@@ -1592,55 +1608,30 @@ void main() {
       );
       addTearDown(scoped.close);
 
-      final result = await scoped.fetchLibraryFiltersWithValues('lib-1', libraryKind: MediaKind.mixed);
+      final result = await scoped.fetchLibraryFiltersWithValues('lib-1');
 
       expect(captured, isNotNull);
       expect(captured!.path, '/Items/Filters');
       expect(captured!.queryParameters['ParentId'], 'lib-1');
       expect(captured!.queryParameters['userId'], 'user-1');
-      expect(captured!.queryParameters['IncludeItemTypes'], 'Movie,Series');
-      expect(captured!.queryParameters.containsKey('Recursive'), isFalse);
-      expect(result.filters.map((filter) => filter.filter), ['unwatched', 'genre', 'year', 'contentRating', 'tag']);
+      expect(result.filters.map((filter) => filter.filter), [
+        'unwatched',
+        'favorite',
+        'genre',
+        'year',
+        'contentRating',
+        'tag',
+      ]);
       expect(result.filters.first.filterType, 'boolean');
       expect(result.filters.first.key, 'jellyfin:unwatched');
       expect(result.filters.first.title, 'Unwatched');
+      expect(result.filters[1].filterType, 'boolean');
+      expect(result.filters[1].key, 'jellyfin:favorite');
+      expect(result.filters[1].title, 'Favorites');
       expect(result.cachedValues.containsKey('unwatched'), isFalse);
+      expect(result.cachedValues.containsKey('favorite'), isFalse);
       expect(result.cachedValues['genre']!.map((value) => value.key), ['Action', 'Drama']);
       expect(result.cachedValues['year']!.map((value) => value.key), ['2024', '1999']);
-    });
-
-    test('fetchLibraryFiltersWithValues falls back to Filters2 when legacy genres are empty', () async {
-      final captured = <Uri>[];
-      final scoped = JellyfinClient.forTesting(
-        connection: _conn(),
-        httpClient: MockClient((req) async {
-          captured.add(req.url);
-          if (req.url.path.endsWith('/Items/Filters')) {
-            return http.Response(
-              jsonEncode({'Genres': <String>[], 'Tags': <String>[], 'OfficialRatings': <String>[], 'Years': <int>[]}),
-              200,
-              headers: {'content-type': 'application/json'},
-            );
-          }
-          return http.Response(
-            jsonEncode({
-              'Genres': [
-                {'Name': 'Action', 'Id': 'genre-action'},
-                {'Name': 'Drama', 'Id': 'genre-drama'},
-              ],
-            }),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
-        }),
-      );
-      addTearDown(scoped.close);
-
-      final result = await scoped.fetchLibraryFiltersWithValues('lib-1', libraryKind: MediaKind.show);
-
-      expect(captured.map((uri) => uri.path), ['/Items/Filters', '/Items/Filters2']);
-      expect(result.filters.map((filter) => filter.filter), ['unwatched', 'genre']);
-      expect(result.cachedValues['genre']!.map((value) => value.key), ['Action', 'Drama']);
     });
 
     test('fetchLibraryContent uses sentinel total fallback when server omits total', () async {

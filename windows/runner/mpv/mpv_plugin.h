@@ -15,7 +15,6 @@
 #include <queue>
 
 #include "display_mode_manager.h"
-#include "mpv_core.h"
 #include "mpv_player.h"
 
 // C-style registration function for the plugin.
@@ -54,6 +53,7 @@ class MpvPlayerPlugin : public flutter::Plugin {
   std::optional<int32_t> proc_id_;
   std::mutex platform_tasks_mutex_;
   std::queue<std::function<void()>> platform_tasks_;
+  bool wakeup_posted_ = false;  // guarded by platform_tasks_mutex_
 };
 
 }  // namespace mpv

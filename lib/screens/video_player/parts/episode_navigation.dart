@@ -108,10 +108,18 @@ extension _VideoPlayerEpisodeNavigationMethods on VideoPlayerScreenState {
       return;
     }
 
+    // Carry the playing version to the next episode by signature — its Media
+    // list may order versions differently, so the bare index is a guess and
+    // the source id is per-episode.
+    final currentVersionSignature =
+        _effectiveSelectedMediaIndex >= 0 && _effectiveSelectedMediaIndex < _availableVersions.length
+        ? _availableVersions[_effectiveSelectedMediaIndex].signature
+        : null;
     await _reloadMediaInPlace(
       metadata: episodeMetadata,
       selectedMediaIndex: _effectiveSelectedMediaIndex,
       selectedMediaSourceId: null,
+      preferredVersionSignature: currentVersionSignature,
       qualityPreset: _selectedQualityPreset,
       // Stream ids are per-part: the previous episode's audio id is
       // meaningless on the new item, so let preferences pick the track.
@@ -160,7 +168,7 @@ extension _VideoPlayerEpisodeNavigationMethods on VideoPlayerScreenState {
 
     try {
       if (isVersionChange) {
-        await saveMediaVersionIndexFor(_currentMetadata, effectiveMediaIndex);
+        await saveMediaVersionPreferenceFor(_currentMetadata, index: effectiveMediaIndex, versions: _availableVersions);
       }
 
       if (isSubtitleChange || (isAudioChange && isPlexBacked)) {
@@ -206,11 +214,13 @@ extension _VideoPlayerEpisodeNavigationMethods on VideoPlayerScreenState {
     required MediaItem metadata,
     int? selectedMediaIndex,
     String? selectedMediaSourceId,
+    String? preferredVersionSignature,
     TranscodeQualityPreset? qualityPreset,
     int? selectedAudioStreamId,
     Duration? resumePosition,
     bool preserveCurrentTrackSelection = false,
     bool useCurrentAudioStreamSelection = true,
+    bool showErrorUi = true,
     String reason = 'media reload',
   }) async {
     if (widget.isLive) {
@@ -325,6 +335,7 @@ extension _VideoPlayerEpisodeNavigationMethods on VideoPlayerScreenState {
         metadata: metadataForResolve,
         selectedMediaIndex: targetMediaIndex,
         selectedMediaSourceId: selectedMediaSourceId,
+        preferredVersionSignature: preferredVersionSignature,
         offlineLibraryMode: _offlineLibraryMode,
         qualityPreset: targetQualityPreset,
         selectedAudioStreamId: targetAudioStreamId,
@@ -555,7 +566,7 @@ extension _VideoPlayerEpisodeNavigationMethods on VideoPlayerScreenState {
       });
       if (isItemChange) _showChromeForSwappedItem();
       appLogger.e('Failed to reload media in-place during $reason', error: e);
-      if (mounted) {
+      if (mounted && showErrorUi) {
         showErrorSnackBar(context, t.messages.errorLoading(error: e.toString()));
       }
       return true;

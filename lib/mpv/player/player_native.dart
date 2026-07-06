@@ -303,7 +303,7 @@ class PlayerNative extends PlayerBase {
       await _applyPassthrough(false);
     }
     await setProperty('speed', rate.toString());
-    if (_passthroughRequested && !_passthroughActive && rate == 1.0) {
+    if (_passthroughRequested && !_passthroughActive && rate == 1.0 && !_downmixEnabled) {
       await _applyPassthrough(true);
     }
   }
@@ -378,6 +378,8 @@ class PlayerNative extends PlayerBase {
 
   bool _passthroughRequested = false;
   bool _passthroughActive = false;
+  bool _normalizationRequested = false;
+  bool _downmixEnabled = false;
   double _currentRate = 1.0;
 
   @override
@@ -391,19 +393,49 @@ class PlayerNative extends PlayerBase {
   @override
   Future<void> setAudioPassthrough(bool enabled) async {
     _passthroughRequested = enabled;
-    // Deferred until the rate returns to 1.0 (see setRate).
-    if (enabled && _currentRate != 1.0) return;
+    // Deferred until the rate returns to 1.0 (see setRate) and the stereo
+    // downmix ends (see setAudioDownmix).
+    if (enabled && (_currentRate != 1.0 || _downmixEnabled)) return;
     await _applyPassthrough(enabled);
   }
 
   Future<void> _applyPassthrough(bool enabled) async {
     _passthroughActive = enabled;
+    // loudnorm decodes to PCM, which defeats bitstream passthrough; the
+    // filter yields while passthrough is active and returns when it ends.
+    if (enabled && _normalizationRequested) {
+      await super.setAudioNormalization(false);
+    }
     await setProperty('audio-spdif', enabled ? _passthroughCodecs : '');
     // audio-exclusive redirects coreaudio to coreaudio_exclusive on macOS
     // (and exclusive WASAPI on Windows); on iOS/tvOS it is set once at
     // playback start and must not be clobbered here.
     if (!Platform.isIOS) {
       await setProperty('audio-exclusive', enabled ? 'yes' : 'no');
+    }
+    if (!enabled && _normalizationRequested) {
+      await super.setAudioNormalization(true);
+    }
+  }
+
+  @override
+  Future<void> setAudioNormalization(bool enabled) async {
+    _normalizationRequested = enabled;
+    if (enabled && _passthroughActive) return; // deferred until passthrough ends
+    await super.setAudioNormalization(enabled);
+  }
+
+  @override
+  Future<void> setAudioDownmix({required bool enabled, required int centerBoostDb, required bool normalize}) async {
+    _downmixEnabled = enabled;
+    // spdif bypasses the filter chain entirely; passthrough yields while a
+    // stereo downmix is forced and returns when it is disabled.
+    if (enabled && _passthroughActive) {
+      await _applyPassthrough(false);
+    }
+    await super.setAudioDownmix(enabled: enabled, centerBoostDb: centerBoostDb, normalize: normalize);
+    if (!enabled && _passthroughRequested && !_passthroughActive && _currentRate == 1.0) {
+      await _applyPassthrough(true);
     }
   }
 

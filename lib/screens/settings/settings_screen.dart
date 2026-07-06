@@ -36,12 +36,12 @@ import '../../utils/update_dialog.dart';
 import '../../widgets/emby_glass_settings.dart';
 import '../../widgets/emby_glass_shell.dart';
 import '../../widgets/dialog_action_button.dart';
+import '../../widgets/library_management_sheet.dart';
 import '../../widgets/setting_tile.dart';
 import '../../widgets/settings_builder.dart';
 import '../../widgets/settings_section.dart';
 import '../../profiles/active_profile_provider.dart';
 import '../../profiles/profile.dart';
-import '../../profiles/profile_registry.dart';
 import 'about_screen.dart';
 import 'add_connection_screen.dart';
 import 'appearance_settings_screen.dart';
@@ -66,6 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
   static const _kDonate = 'donate';
   static const _kAppearance = 'appearance';
   static const _kPlayback = 'playback';
+  static const _kManageLibraries = 'manage_libraries';
   static const _kTrackers = 'trackers';
   static const _kDownloadLocation = 'download_location';
   static const _kDownloadOnWifiOnly = 'download_on_wifi_only';
@@ -137,6 +138,8 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
 
   @override
   Widget build(BuildContext context) {
+    final hasLibraries = context.select<LibrariesProvider, bool>((p) => p.libraries.isNotEmpty);
+
     return Focus(
       onKeyEvent: _handleKeyEvent,
       child: EmbyGlassScrollScaffold(
@@ -147,6 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
               if (DonationService.isEnabled) _buildDonateTile(),
               _buildAppearanceTile(),
               _buildPlaybackTile(),
+              if (hasLibraries) _buildManageLibrariesTile(),
               _buildTrackersTile(),
               _buildConnectionsSection(),
               _buildProfilesSection(),
@@ -154,7 +158,7 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
               if (_keyboardShortcutsSupported) ...[_buildKeyboardShortcutsSection()],
               _buildAdvancedSection(),
               if (UpdateService.isUpdateCheckEnabled) ...[_buildUpdateSection()],
-              if (!PlatformDetector.isTV()) _buildBackupSection(),
+              if (!PlatformDetector.isTV() || PlatformDetector.isDesktopOS()) _buildBackupSection(),
               SettingNavigationTile(
                 focusNode: _focusTracker.get(_kAbout),
                 icon: Symbols.info_rounded,
@@ -211,6 +215,16 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
     );
   }
 
+  Widget _buildManageLibrariesTile() {
+    return SettingNavigationTile(
+      focusNode: _focusTracker.get(_kManageLibraries),
+      icon: Symbols.video_library_rounded,
+      title: t.libraries.manageLibraries,
+      subtitle: t.settings.manageLibrariesDescription,
+      onTap: () => showLibraryManagementSheet(context),
+    );
+  }
+
   Widget _buildTrackersTile() {
     return Consumer2<TraktAccountProvider, TrackersProvider>(
       builder: (context, trakt, trackers, _) {
@@ -238,10 +252,9 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
         ? t.connections.addConnectionSubtitleNoProfile
         : t.connections.addConnectionSubtitleScoped(displayName: active.displayName);
 
-    return Column(
-      crossAxisAlignment: .start,
+    return SettingsGroup(
+      title: t.connections.sectionTitle,
       children: [
-        SettingsSectionHeader(t.connections.sectionTitle),
         // Connections are managed per-profile (via the Profiles section
         // and each profile's detail screen). The shortcut here just opens
         // the picker scoped to the active profile so users can add a Plex
@@ -255,34 +268,32 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
             Navigator.push(context, MaterialPageRoute(builder: (_) => AddConnectionScreen(targetProfile: active)));
           },
         ),
+        _buildProfilesTile(),
       ],
     );
   }
 
-  Widget _buildProfilesSection() {
-    return StreamBuilder<List<Profile>>(
-      stream: context.read<ProfileRegistry>().watchProfiles(),
-      builder: (context, snapshot) {
-        final count = snapshot.data?.length ?? 0;
-        // `context.select` so this StreamBuilder doesn't rebuild on every
-        // ActiveProfileProvider notification — only when the active
-        // profile's display name actually changes.
-        final activeName = context.select<ActiveProfileProvider, String?>((p) => p.active?.displayName);
-        final subtitle = count <= 1
-            ? t.profiles.summarySingle
-            : (activeName != null
-                  ? t.profiles.summaryMultipleWithActive(count: count, activeName: activeName)
-                  : t.profiles.summaryMultiple(count: count));
-        return SettingNavigationTile(
-          icon: Symbols.group_rounded,
-          title: t.profiles.sectionTitle,
-          subtitle: subtitle,
-          onTap: () => Navigator.of(
-            context,
-            rootNavigator: true,
-          ).push(MaterialPageRoute(builder: (_) => const ProfileSwitchScreen())),
-        );
-      },
+  Widget _buildProfilesTile() {
+    // ActiveProfileProvider already merges local rows with virtual Plex
+    // Home profiles — counting only the local DB rows made every Plex Home
+    // household read as a single profile here. `context.select` keeps
+    // rebuilds scoped to actual count/name changes (a StreamBuilder here
+    // was also re-created on every settings rebuild).
+    final count = context.select<ActiveProfileProvider, int>((p) => p.profiles.length);
+    final activeName = context.select<ActiveProfileProvider, String?>((p) => p.active?.displayName);
+    final subtitle = count <= 1
+        ? t.profiles.summarySingle
+        : (activeName != null
+              ? t.profiles.summaryMultipleWithActive(count: count, activeName: activeName)
+              : t.profiles.summaryMultiple(count: count));
+    return SettingNavigationTile(
+      icon: Symbols.group_rounded,
+      title: t.profiles.sectionTitle,
+      subtitle: subtitle,
+      onTap: () => Navigator.of(
+        context,
+        rootNavigator: true,
+      ).push(MaterialPageRoute(builder: (_) => const ProfileSwitchScreen())),
     );
   }
 
@@ -290,10 +301,9 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
     final storageService = DownloadStorageService.instance;
     final isCustom = storageService.isUsingCustomPath();
 
-    return Column(
-      crossAxisAlignment: .start,
+    return SettingsGroup(
+      title: t.settings.downloads,
       children: [
-        SettingsSectionHeader(t.settings.downloads),
         if (!Platform.isIOS)
           FutureBuilder<String>(
             future: storageService.getCurrentDownloadPathDisplay(),
@@ -336,10 +346,9 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
   Widget _buildKeyboardShortcutsSection() {
     if (_keyboardService == null) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: .start,
+    return SettingsGroup(
+      title: t.settings.keyboardShortcuts,
       children: [
-        SettingsSectionHeader(t.settings.keyboardShortcuts),
         SettingNavigationTile(
           focusNode: _focusTracker.get(_kVideoPlayerControls),
           icon: Symbols.keyboard_rounded,
@@ -364,10 +373,9 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
   }
 
   Widget _buildAdvancedSection() {
-    return Column(
-      crossAxisAlignment: .start,
+    return SettingsGroup(
+      title: t.settings.advanced,
       children: [
-        SettingsSectionHeader(t.settings.advanced),
         ListTile(
           leading: const AppIcon(Symbols.computer_rounded, fill: 1),
           title: Text(t.settings.customDeviceName),
@@ -449,10 +457,9 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
   }
 
   Widget _buildBackupSection() {
-    return Column(
-      crossAxisAlignment: .start,
+    return SettingsGroup(
+      title: t.settings.backup,
       children: [
-        SettingsSectionHeader(t.settings.backup),
         ListTile(
           focusNode: _focusTracker.get(_kExportSettings),
           leading: const AppIcon(Symbols.upload_rounded, fill: 1),
@@ -483,10 +490,9 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
 
   Widget _buildUpdateSection() {
     if (UpdateService.useNativeUpdater) {
-      return Column(
-        crossAxisAlignment: .start,
+      return SettingsGroup(
+        title: t.settings.updates,
         children: [
-          SettingsSectionHeader(t.settings.updates),
           ListTile(
             focusNode: _focusTracker.get(_kCheckForUpdates),
             leading: const AppIcon(Symbols.system_update_rounded, fill: 1),
@@ -501,10 +507,9 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
 
     final hasUpdate = _updateInfo != null && _updateInfo!['hasUpdate'] == true;
 
-    return Column(
-      crossAxisAlignment: .start,
+    return SettingsGroup(
+      title: t.settings.updates,
       children: [
-        SettingsSectionHeader(t.settings.updates),
         ListTile(
           focusNode: _focusTracker.get(_kCheckForUpdates),
           leading: AppIcon(

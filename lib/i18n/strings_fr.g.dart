@@ -271,7 +271,7 @@ class _TranslationsSettingsFr extends TranslationsSettingsEn {
 	@override String get hideSpoilers => 'Masquer les spoilers des épisodes non vus';
 	@override String get hideSpoilersDescription => 'Flouter les miniatures et descriptions des épisodes non vus';
 	@override String get playerBackend => 'Moteur de lecture';
-	@override String get exoPlayer => 'ExoPlayer (Recommandé)';
+	@override String get exoPlayer => 'ExoPlayer';
 	@override String get mpv => 'mpv';
 	@override String get hardwareDecoding => 'Décodage matériel';
 	@override String get hardwareDecodingDescription => 'Utilisez l\'accélération matérielle lorsqu\'elle est disponible.';
@@ -393,6 +393,30 @@ class _TranslationsSettingsFr extends TranslationsSettingsEn {
 	@override String get tunneledPlaybackDescription => 'Utiliser le tunneling vidéo. Désactivez si la lecture HDR affiche un écran noir.';
 	@override String get audioPassthrough => 'Audio Pass-Through';
 	@override String get audioPassthroughDescription => 'Envoyez l\'audio Dolby/DTS vers votre ampli ou téléviseur sans réencodage, en conservant le son surround. Désactivez si vous n\'avez aucun son.';
+	@override String get audioPassthroughDescriptionAppleTv => 'Transmet le Dolby Digital Plus (y compris Atmos) au système en bitstream. Le DTS et le TrueHD restent lus en PCM multicanal. De brèves coupures audio peuvent survenir lors des sauts.';
+	@override String get audioDownmix => 'Downmix en stéréo';
+	@override String get audioDownmixDescription => 'Réduit le son surround à deux canaux pour les enceintes stéréo ou le casque';
+	@override String get downmixCenterBoost => 'Renforcement du canal central';
+	@override String downmixCenterBoostValue({required Object db}) => '${db} dB';
+	@override String get downmixCenterBoostLabel => 'Renforcement (dB)';
+	@override String get downmixCenterBoostShort => 'dB';
+	@override String get audioDownmixNormalize => 'Normaliser le volume lors du downmix';
+	@override String get audioDownmixNormalizeDescription => 'Atténue le mixage pour éviter la saturation. Désactivez pour conserver le volume d\'origine (risque de distorsion sur les scènes fortes).';
+	@override String get atmosDiagnostics => 'Test de sortie Atmos';
+	@override String get atmosDiagnosticsDescription => 'Diagnostiquer la sortie Dolby Atmos en lisant des signaux de test via le lecteur système';
+	@override String get atmosTestHlsAtmos => 'Flux Atmos d\'Apple';
+	@override String get atmosTestHlsAtmosDescription => 'Flux Dolby Atmos réputé fiable. L\'ampli devrait afficher Dolby Atmos.';
+	@override String get atmosTestHlsControl => 'Flux surround d\'Apple';
+	@override String get atmosTestHlsControlDescription => 'Flux témoin sans Atmos. L\'ampli devrait afficher du surround sans Atmos.';
+	@override String get atmosTestRawStream => 'Flux EAC3 brut';
+	@override String get atmosTestRawStreamDescription => 'Diffuse le fichier de test exactement comme la lecture Atmos du lecteur. Nécessite l\'URL du fichier de test.';
+	@override String get atmosTestRawFile => 'Fichier EAC3 brut';
+	@override String get atmosTestRawFileDescription => 'Lit le fichier de test avec une longueur connue. Nécessite l\'URL du fichier de test.';
+	@override String get atmosTestStop => 'Arrêter le test';
+	@override String get atmosTestUrl => 'URL du fichier de test';
+	@override String get atmosTestUrlDescription => 'URL HTTP d\'un fichier .ec3 Dolby Atmos brut (extrait par ex. avec ffmpeg)';
+	@override String get atmosTestUrlMissing => 'Définissez d\'abord l\'URL du fichier de test';
+	@override String get atmosTestStatus => 'État';
 	@override String get dvConversionMode => 'Conversion Dolby Vision';
 	@override String get dvConversionModeDescription => 'Choisissez comment ExoPlayer gère les fichiers Dolby Vision Profile 7.';
 	@override String get dvConversionAuto => 'Auto';
@@ -528,9 +552,6 @@ class _TranslationsRateSheetFr extends TranslationsRateSheetEn {
 	@override String starValue({required Object rating}) => '${rating} / 5';
 	@override String scoreValue({required Object score}) => '${score} / 10';
 	@override String get setScore => 'Définir une note';
-	@override String get notRated => 'Non noté';
-	@override String get liked => 'Aimé';
-	@override String get notLiked => 'Non aimé';
 	@override String get saved => 'Enregistré';
 	@override String get notAvailable => 'Aucune correspondance trouvée';
 	@override String get noConnectedTrackers => 'Connectez un tracker dans Paramètres pour y noter.';
@@ -829,7 +850,9 @@ class _TranslationsProfilesFr extends TranslationsProfilesEn {
 	@override String get borrowConnectionBorrowed => 'Connexion empruntée.';
 	@override String get borrowFailed => 'Impossible d\'emprunter la connexion.';
 	@override String get incorrectPin => 'PIN incorrect.';
+	@override String get incorrectPinTryAgain => 'PIN incorrect. Veuillez réessayer.';
 	@override String get sourceProfileMissingParentAccount => 'Le profil source n\'a pas son compte parent.';
+	@override String get failedToLoadHomeUsers => 'Impossible de charger vos utilisateurs Plex Home. Vérifiez votre connexion et réessayez.';
 	@override String get failedToVerifyPin => 'Impossible de vérifier le PIN.';
 	@override String get newProfile => 'Nouveau profil';
 	@override String get profileNameHint => 'ex. Invités, Enfants, Salon familial';
@@ -1376,6 +1399,7 @@ class _TranslationsVideoSettingsFr extends TranslationsVideoSettingsEn {
 	@override String get performanceOverlay => 'Superposition de performance';
 	@override String get audioPassthrough => 'Audio Pass-Through';
 	@override String get audioNormalization => 'Normaliser le volume';
+	@override String get audioDownmix => 'Downmix en stéréo';
 }
 
 // Path: performanceOverlay
@@ -2060,7 +2084,7 @@ extension on TranslationsFr {
 			'settings.hideSpoilers' => 'Masquer les spoilers des épisodes non vus',
 			'settings.hideSpoilersDescription' => 'Flouter les miniatures et descriptions des épisodes non vus',
 			'settings.playerBackend' => 'Moteur de lecture',
-			'settings.exoPlayer' => 'ExoPlayer (Recommandé)',
+			'settings.exoPlayer' => 'ExoPlayer',
 			'settings.mpv' => 'mpv',
 			'settings.hardwareDecoding' => 'Décodage matériel',
 			'settings.hardwareDecodingDescription' => 'Utilisez l\'accélération matérielle lorsqu\'elle est disponible.',
@@ -2182,6 +2206,30 @@ extension on TranslationsFr {
 			'settings.tunneledPlaybackDescription' => 'Utiliser le tunneling vidéo. Désactivez si la lecture HDR affiche un écran noir.',
 			'settings.audioPassthrough' => 'Audio Pass-Through',
 			'settings.audioPassthroughDescription' => 'Envoyez l\'audio Dolby/DTS vers votre ampli ou téléviseur sans réencodage, en conservant le son surround. Désactivez si vous n\'avez aucun son.',
+			'settings.audioPassthroughDescriptionAppleTv' => 'Transmet le Dolby Digital Plus (y compris Atmos) au système en bitstream. Le DTS et le TrueHD restent lus en PCM multicanal. De brèves coupures audio peuvent survenir lors des sauts.',
+			'settings.audioDownmix' => 'Downmix en stéréo',
+			'settings.audioDownmixDescription' => 'Réduit le son surround à deux canaux pour les enceintes stéréo ou le casque',
+			'settings.downmixCenterBoost' => 'Renforcement du canal central',
+			'settings.downmixCenterBoostValue' => ({required Object db}) => '${db} dB',
+			'settings.downmixCenterBoostLabel' => 'Renforcement (dB)',
+			'settings.downmixCenterBoostShort' => 'dB',
+			'settings.audioDownmixNormalize' => 'Normaliser le volume lors du downmix',
+			'settings.audioDownmixNormalizeDescription' => 'Atténue le mixage pour éviter la saturation. Désactivez pour conserver le volume d\'origine (risque de distorsion sur les scènes fortes).',
+			'settings.atmosDiagnostics' => 'Test de sortie Atmos',
+			'settings.atmosDiagnosticsDescription' => 'Diagnostiquer la sortie Dolby Atmos en lisant des signaux de test via le lecteur système',
+			'settings.atmosTestHlsAtmos' => 'Flux Atmos d\'Apple',
+			'settings.atmosTestHlsAtmosDescription' => 'Flux Dolby Atmos réputé fiable. L\'ampli devrait afficher Dolby Atmos.',
+			'settings.atmosTestHlsControl' => 'Flux surround d\'Apple',
+			'settings.atmosTestHlsControlDescription' => 'Flux témoin sans Atmos. L\'ampli devrait afficher du surround sans Atmos.',
+			'settings.atmosTestRawStream' => 'Flux EAC3 brut',
+			'settings.atmosTestRawStreamDescription' => 'Diffuse le fichier de test exactement comme la lecture Atmos du lecteur. Nécessite l\'URL du fichier de test.',
+			'settings.atmosTestRawFile' => 'Fichier EAC3 brut',
+			'settings.atmosTestRawFileDescription' => 'Lit le fichier de test avec une longueur connue. Nécessite l\'URL du fichier de test.',
+			'settings.atmosTestStop' => 'Arrêter le test',
+			'settings.atmosTestUrl' => 'URL du fichier de test',
+			'settings.atmosTestUrlDescription' => 'URL HTTP d\'un fichier .ec3 Dolby Atmos brut (extrait par ex. avec ffmpeg)',
+			'settings.atmosTestUrlMissing' => 'Définissez d\'abord l\'URL du fichier de test',
+			'settings.atmosTestStatus' => 'État',
 			'settings.dvConversionMode' => 'Conversion Dolby Vision',
 			'settings.dvConversionModeDescription' => 'Choisissez comment ExoPlayer gère les fichiers Dolby Vision Profile 7.',
 			'settings.dvConversionAuto' => 'Auto',
@@ -2296,9 +2344,6 @@ extension on TranslationsFr {
 			'rateSheet.starValue' => ({required Object rating}) => '${rating} / 5',
 			'rateSheet.scoreValue' => ({required Object score}) => '${score} / 10',
 			'rateSheet.setScore' => 'Définir une note',
-			'rateSheet.notRated' => 'Non noté',
-			'rateSheet.liked' => 'Aimé',
-			'rateSheet.notLiked' => 'Non aimé',
 			'rateSheet.saved' => 'Enregistré',
 			'rateSheet.notAvailable' => 'Aucune correspondance trouvée',
 			'rateSheet.noConnectedTrackers' => 'Connectez un tracker dans Paramètres pour y noter.',
@@ -2419,6 +2464,8 @@ extension on TranslationsFr {
 			'messages.logsCleared' => 'Logs effacés',
 			'messages.logsCopied' => 'Logs copiés dans le presse-papier',
 			'messages.noLogsAvailable' => 'Aucun log disponible',
+			_ => null,
+		} ?? switch (path) {
 			'messages.libraryScanning' => ({required Object title}) => 'Scan de "${title}"...',
 			'messages.libraryScanStarted' => ({required Object title}) => 'Scan de la bibliothèque démarrée pour "${title}"',
 			'messages.libraryScanFailed' => ({required Object error}) => 'Échec du scan de la bibliothèque: ${error}',
@@ -2440,8 +2487,6 @@ extension on TranslationsFr {
 			'messages.serverLimitTitle' => 'Échec de la lecture',
 			'messages.serverLimitBody' => 'Erreur serveur (HTTP 500). Une limite de bande passante/transcodage a probablement rejeté cette session. Demandez au propriétaire de l\'ajuster.',
 			'messages.logsUploaded' => 'Logs envoyés',
-			_ => null,
-		} ?? switch (path) {
 			'messages.logsUploadFailed' => 'Échec de l\'envoi des logs',
 			'messages.logId' => 'ID du log',
 			'subtitlingStyling.text' => 'Texte',
@@ -2524,7 +2569,9 @@ extension on TranslationsFr {
 			'profiles.borrowConnectionBorrowed' => 'Connexion empruntée.',
 			'profiles.borrowFailed' => 'Impossible d\'emprunter la connexion.',
 			'profiles.incorrectPin' => 'PIN incorrect.',
+			'profiles.incorrectPinTryAgain' => 'PIN incorrect. Veuillez réessayer.',
 			'profiles.sourceProfileMissingParentAccount' => 'Le profil source n\'a pas son compte parent.',
+			'profiles.failedToLoadHomeUsers' => 'Impossible de charger vos utilisateurs Plex Home. Vérifiez votre connexion et réessayez.',
 			'profiles.failedToVerifyPin' => 'Impossible de vérifier le PIN.',
 			'profiles.newProfile' => 'Nouveau profil',
 			'profiles.profileNameHint' => 'ex. Invités, Enfants, Salon familial',
@@ -2931,6 +2978,8 @@ extension on TranslationsFr {
 			'companionRemote.session.startingServer' => 'Démarrage du serveur distant...',
 			'companionRemote.session.failedToCreate' => 'Échec du démarrage du serveur distant :',
 			'companionRemote.session.hostAddress' => 'Adresse de l\'hôte',
+			_ => null,
+		} ?? switch (path) {
 			'companionRemote.session.connected' => 'Connecté',
 			'companionRemote.session.serverRunning' => 'Serveur distant actif',
 			'companionRemote.session.serverStopped' => 'Serveur distant arrêté',
@@ -2954,8 +3003,6 @@ extension on TranslationsFr {
 			'companionRemote.pairing.connectionTimedOut' => 'Connexion expirée. Utilisez le même réseau sur les deux appareils.',
 			'companionRemote.pairing.sessionNotFound' => 'Appareil introuvable. Assurez-vous que Vitreous fonctionne sur l\'hôte.',
 			'companionRemote.pairing.authFailed' => 'Échec de l\'authentification. Les deux appareils doivent utiliser le même compte Plex.',
-			_ => null,
-		} ?? switch (path) {
 			'companionRemote.pairing.failedToConnect' => ({required Object error}) => 'Échec de la connexion : ${error}',
 			'companionRemote.remote.disconnectConfirm' => 'Voulez-vous vous déconnecter de la session distante ?',
 			'companionRemote.remote.reconnecting' => 'Reconnexion...',
@@ -3000,6 +3047,7 @@ extension on TranslationsFr {
 			'videoSettings.performanceOverlay' => 'Superposition de performance',
 			'videoSettings.audioPassthrough' => 'Audio Pass-Through',
 			'videoSettings.audioNormalization' => 'Normaliser le volume',
+			'videoSettings.audioDownmix' => 'Downmix en stéréo',
 			'performanceOverlay.color' => 'Couleur',
 			'performanceOverlay.performance' => 'Performances',
 			'performanceOverlay.buffer' => 'Tampon',

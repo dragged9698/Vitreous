@@ -271,7 +271,7 @@ class _TranslationsSettingsZh extends TranslationsSettingsEn {
 	@override String get hideSpoilers => '隐藏未看剧集的剧透内容';
 	@override String get hideSpoilersDescription => '模糊未观看剧集的缩略图和描述';
 	@override String get playerBackend => '播放器引擎';
-	@override String get exoPlayer => 'ExoPlayer（推荐）';
+	@override String get exoPlayer => 'ExoPlayer';
 	@override String get mpv => 'mpv';
 	@override String get hardwareDecoding => '硬件解码';
 	@override String get hardwareDecodingDescription => '如果可用，使用硬件加速';
@@ -393,6 +393,30 @@ class _TranslationsSettingsZh extends TranslationsSettingsEn {
 	@override String get tunneledPlaybackDescription => '使用视频隧道。若 HDR 播放出现黑屏，请禁用。';
 	@override String get audioPassthrough => '音频直通';
 	@override String get audioPassthroughDescription => '将 Dolby/DTS 音频不经重新编码直接发送到功放或电视，保留环绕声。如果没有声音，请关闭。';
+	@override String get audioPassthroughDescriptionAppleTv => '将 Dolby Digital Plus（含 Atmos）以比特流方式交给系统输出。DTS 和 TrueHD 仍以多声道 PCM 播放。快进快退时可能出现短暂声音中断。';
+	@override String get audioDownmix => '下混为立体声';
+	@override String get audioDownmixDescription => '将环绕声混合为双声道，适用于立体声音箱或耳机';
+	@override String get downmixCenterBoost => '中置声道增强';
+	@override String downmixCenterBoostValue({required Object db}) => '${db} dB';
+	@override String get downmixCenterBoostLabel => '增强 (dB)';
+	@override String get downmixCenterBoostShort => 'dB';
+	@override String get audioDownmixNormalize => '下混时音量标准化';
+	@override String get audioDownmixNormalizeDescription => '降低混音电平以防止削波。关闭可保持原始音量（大音量场景可能失真）。';
+	@override String get atmosDiagnostics => 'Atmos 输出测试';
+	@override String get atmosDiagnosticsDescription => '通过系统播放器播放测试信号，诊断 Dolby Atmos 输出';
+	@override String get atmosTestHlsAtmos => 'Apple Atmos 流';
+	@override String get atmosTestHlsAtmosDescription => '已知正常的 Dolby Atmos 流。功放应显示 Dolby Atmos。';
+	@override String get atmosTestHlsControl => 'Apple 环绕声流';
+	@override String get atmosTestHlsControlDescription => '不含 Atmos 的对照流。功放应显示不带 Atmos 的环绕声。';
+	@override String get atmosTestRawStream => '原始 EAC3 流';
+	@override String get atmosTestRawStreamDescription => '以与播放器内 Atmos 播放完全相同的方式串流测试文件。需要测试文件 URL。';
+	@override String get atmosTestRawFile => '原始 EAC3 文件';
+	@override String get atmosTestRawFileDescription => '以已知长度播放测试文件。需要测试文件 URL。';
+	@override String get atmosTestStop => '停止测试';
+	@override String get atmosTestUrl => '测试文件 URL';
+	@override String get atmosTestUrlDescription => '原始 .ec3 Dolby Atmos 文件的 HTTP URL（例如用 ffmpeg 提取）';
+	@override String get atmosTestUrlMissing => '请先设置测试文件 URL';
+	@override String get atmosTestStatus => '状态';
 	@override String get dvConversionMode => 'Dolby Vision 转换';
 	@override String get dvConversionModeDescription => '选择 ExoPlayer 如何处理 Dolby Vision Profile 7 文件。';
 	@override String get dvConversionAuto => '自动';
@@ -528,9 +552,6 @@ class _TranslationsRateSheetZh extends TranslationsRateSheetEn {
 	@override String starValue({required Object rating}) => '${rating} / 5';
 	@override String scoreValue({required Object score}) => '${score} / 10';
 	@override String get setScore => '设置分数';
-	@override String get notRated => '未评分';
-	@override String get liked => '已喜欢';
-	@override String get notLiked => '未喜欢';
 	@override String get saved => '已保存';
 	@override String get notAvailable => '未找到匹配项';
 	@override String get noConnectedTrackers => '在设置中连接跟踪器即可在那里评分。';
@@ -829,7 +850,9 @@ class _TranslationsProfilesZh extends TranslationsProfilesEn {
 	@override String get borrowConnectionBorrowed => '已借用连接。';
 	@override String get borrowFailed => '无法借用连接。';
 	@override String get incorrectPin => 'PIN 不正确。';
+	@override String get incorrectPinTryAgain => 'PIN 不正确。请重试。';
 	@override String get sourceProfileMissingParentAccount => '源个人资料缺少其父账号。';
+	@override String get failedToLoadHomeUsers => '无法加载您的 Plex Home 用户。请检查网络连接后重试。';
 	@override String get failedToVerifyPin => '无法验证 PIN。';
 	@override String get newProfile => '新建配置文件';
 	@override String get profileNameHint => '例如：访客、儿童、家庭房';
@@ -1376,6 +1399,7 @@ class _TranslationsVideoSettingsZh extends TranslationsVideoSettingsEn {
 	@override String get performanceOverlay => '性能监控';
 	@override String get audioPassthrough => '音频直通';
 	@override String get audioNormalization => '响度标准化';
+	@override String get audioDownmix => '下混为立体声';
 }
 
 // Path: performanceOverlay
@@ -2060,7 +2084,7 @@ extension on TranslationsZh {
 			'settings.hideSpoilers' => '隐藏未看剧集的剧透内容',
 			'settings.hideSpoilersDescription' => '模糊未观看剧集的缩略图和描述',
 			'settings.playerBackend' => '播放器引擎',
-			'settings.exoPlayer' => 'ExoPlayer（推荐）',
+			'settings.exoPlayer' => 'ExoPlayer',
 			'settings.mpv' => 'mpv',
 			'settings.hardwareDecoding' => '硬件解码',
 			'settings.hardwareDecodingDescription' => '如果可用，使用硬件加速',
@@ -2182,6 +2206,30 @@ extension on TranslationsZh {
 			'settings.tunneledPlaybackDescription' => '使用视频隧道。若 HDR 播放出现黑屏，请禁用。',
 			'settings.audioPassthrough' => '音频直通',
 			'settings.audioPassthroughDescription' => '将 Dolby/DTS 音频不经重新编码直接发送到功放或电视，保留环绕声。如果没有声音，请关闭。',
+			'settings.audioPassthroughDescriptionAppleTv' => '将 Dolby Digital Plus（含 Atmos）以比特流方式交给系统输出。DTS 和 TrueHD 仍以多声道 PCM 播放。快进快退时可能出现短暂声音中断。',
+			'settings.audioDownmix' => '下混为立体声',
+			'settings.audioDownmixDescription' => '将环绕声混合为双声道，适用于立体声音箱或耳机',
+			'settings.downmixCenterBoost' => '中置声道增强',
+			'settings.downmixCenterBoostValue' => ({required Object db}) => '${db} dB',
+			'settings.downmixCenterBoostLabel' => '增强 (dB)',
+			'settings.downmixCenterBoostShort' => 'dB',
+			'settings.audioDownmixNormalize' => '下混时音量标准化',
+			'settings.audioDownmixNormalizeDescription' => '降低混音电平以防止削波。关闭可保持原始音量（大音量场景可能失真）。',
+			'settings.atmosDiagnostics' => 'Atmos 输出测试',
+			'settings.atmosDiagnosticsDescription' => '通过系统播放器播放测试信号，诊断 Dolby Atmos 输出',
+			'settings.atmosTestHlsAtmos' => 'Apple Atmos 流',
+			'settings.atmosTestHlsAtmosDescription' => '已知正常的 Dolby Atmos 流。功放应显示 Dolby Atmos。',
+			'settings.atmosTestHlsControl' => 'Apple 环绕声流',
+			'settings.atmosTestHlsControlDescription' => '不含 Atmos 的对照流。功放应显示不带 Atmos 的环绕声。',
+			'settings.atmosTestRawStream' => '原始 EAC3 流',
+			'settings.atmosTestRawStreamDescription' => '以与播放器内 Atmos 播放完全相同的方式串流测试文件。需要测试文件 URL。',
+			'settings.atmosTestRawFile' => '原始 EAC3 文件',
+			'settings.atmosTestRawFileDescription' => '以已知长度播放测试文件。需要测试文件 URL。',
+			'settings.atmosTestStop' => '停止测试',
+			'settings.atmosTestUrl' => '测试文件 URL',
+			'settings.atmosTestUrlDescription' => '原始 .ec3 Dolby Atmos 文件的 HTTP URL（例如用 ffmpeg 提取）',
+			'settings.atmosTestUrlMissing' => '请先设置测试文件 URL',
+			'settings.atmosTestStatus' => '状态',
 			'settings.dvConversionMode' => 'Dolby Vision 转换',
 			'settings.dvConversionModeDescription' => '选择 ExoPlayer 如何处理 Dolby Vision Profile 7 文件。',
 			'settings.dvConversionAuto' => '自动',
@@ -2296,9 +2344,6 @@ extension on TranslationsZh {
 			'rateSheet.starValue' => ({required Object rating}) => '${rating} / 5',
 			'rateSheet.scoreValue' => ({required Object score}) => '${score} / 10',
 			'rateSheet.setScore' => '设置分数',
-			'rateSheet.notRated' => '未评分',
-			'rateSheet.liked' => '已喜欢',
-			'rateSheet.notLiked' => '未喜欢',
 			'rateSheet.saved' => '已保存',
 			'rateSheet.notAvailable' => '未找到匹配项',
 			'rateSheet.noConnectedTrackers' => '在设置中连接跟踪器即可在那里评分。',
@@ -2419,6 +2464,8 @@ extension on TranslationsZh {
 			'messages.logsCleared' => '日志已清除',
 			'messages.logsCopied' => '日志已复制到剪贴板',
 			'messages.noLogsAvailable' => '没有可用日志',
+			_ => null,
+		} ?? switch (path) {
 			'messages.libraryScanning' => ({required Object title}) => '正在扫描 “${title}”...',
 			'messages.libraryScanStarted' => ({required Object title}) => '已开始扫描 “${title}” 媒体库',
 			'messages.libraryScanFailed' => ({required Object error}) => '无法扫描媒体库: ${error}',
@@ -2440,8 +2487,6 @@ extension on TranslationsZh {
 			'messages.serverLimitTitle' => '播放失败',
 			'messages.serverLimitBody' => '服务器错误 (HTTP 500)。带宽/转码限制可能拒绝了此会话。请让所有者调整。',
 			'messages.logsUploaded' => '日志已上传',
-			_ => null,
-		} ?? switch (path) {
 			'messages.logsUploadFailed' => '上传日志失败',
 			'messages.logId' => '日志 ID',
 			'subtitlingStyling.text' => '文本',
@@ -2524,7 +2569,9 @@ extension on TranslationsZh {
 			'profiles.borrowConnectionBorrowed' => '已借用连接。',
 			'profiles.borrowFailed' => '无法借用连接。',
 			'profiles.incorrectPin' => 'PIN 不正确。',
+			'profiles.incorrectPinTryAgain' => 'PIN 不正确。请重试。',
 			'profiles.sourceProfileMissingParentAccount' => '源个人资料缺少其父账号。',
+			'profiles.failedToLoadHomeUsers' => '无法加载您的 Plex Home 用户。请检查网络连接后重试。',
 			'profiles.failedToVerifyPin' => '无法验证 PIN。',
 			'profiles.newProfile' => '新建配置文件',
 			'profiles.profileNameHint' => '例如：访客、儿童、家庭房',
@@ -2931,6 +2978,8 @@ extension on TranslationsZh {
 			'companionRemote.session.startingServer' => '正在启动远程服务器...',
 			'companionRemote.session.failedToCreate' => '启动远程服务器失败：',
 			'companionRemote.session.hostAddress' => '主机地址',
+			_ => null,
+		} ?? switch (path) {
 			'companionRemote.session.connected' => '已连接',
 			'companionRemote.session.serverRunning' => '远程服务器已启动',
 			'companionRemote.session.serverStopped' => '远程服务器已停止',
@@ -2954,8 +3003,6 @@ extension on TranslationsZh {
 			'companionRemote.pairing.connectionTimedOut' => '连接超时。请在两台设备上使用同一网络。',
 			'companionRemote.pairing.sessionNotFound' => '未找到设备。请确认 Vitreous 正在主机上运行。',
 			'companionRemote.pairing.authFailed' => '认证失败。两台设备需要使用同一 Plex 账号。',
-			_ => null,
-		} ?? switch (path) {
 			'companionRemote.pairing.failedToConnect' => ({required Object error}) => '连接失败：${error}',
 			'companionRemote.remote.disconnectConfirm' => '是否要断开远程会话的连接？',
 			'companionRemote.remote.reconnecting' => '重新连接中...',
@@ -3000,6 +3047,7 @@ extension on TranslationsZh {
 			'videoSettings.performanceOverlay' => '性能监控',
 			'videoSettings.audioPassthrough' => '音频直通',
 			'videoSettings.audioNormalization' => '响度标准化',
+			'videoSettings.audioDownmix' => '下混为立体声',
 			'performanceOverlay.color' => '颜色',
 			'performanceOverlay.performance' => '性能',
 			'performanceOverlay.buffer' => '缓冲',

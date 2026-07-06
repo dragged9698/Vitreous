@@ -34,6 +34,7 @@ import '../mixins/tab_visibility_aware.dart';
 import '../navigation/navigation_tabs.dart';
 import '../navigation/profile_navigation_scope.dart';
 import '../profiles/active_profile_binder.dart';
+import '../connection/connection_registry.dart';
 import '../profiles/active_profile_provider.dart';
 import '../profiles/plex_home_service.dart';
 import '../providers/download_provider.dart';
@@ -64,6 +65,7 @@ import 'search_screen.dart';
 import 'downloads/downloads_screen.dart';
 import 'settings/settings_screen.dart';
 import 'profile/profile_switch_screen.dart';
+import 'profile/profile_teardown.dart';
 import '../services/system_shelf_service.dart';
 import '../watch_together/watch_together.dart';
 
@@ -155,7 +157,7 @@ bool shouldPassTvosMenuToSystem({
 }
 
 @visibleForTesting
-enum ProfileInvalidationAction { none, waitForProfileSwitch, invalidateNow }
+enum ProfileInvalidationAction { none, invalidateNow }
 
 @visibleForTesting
 ProfileInvalidationAction profileInvalidationAction({
@@ -163,13 +165,13 @@ ProfileInvalidationAction profileInvalidationAction({
   required String? currentProfileId,
   required bool wasBindingPreviously,
   required bool isBindingNow,
-  required bool hasPendingProfileSwitchInvalidation,
-  required String? pendingProfileSwitchInvalidationId,
 }) {
+  // An active-id change remounts the whole session subtree
+  // ([ProfileSessionScreen] keys on the id), recreating this screen and
+  // every session-scoped provider — nothing to invalidate from here. The
+  // app-global pieces (ApiCache volatile rows) are cleared at that remount
+  // seam, where the unmount can't outrun the work.
   if (currentProfileId != previousProfileId) {
-    return ProfileInvalidationAction.waitForProfileSwitch;
-  }
-  if (hasPendingProfileSwitchInvalidation && pendingProfileSwitchInvalidationId == currentProfileId) {
     return ProfileInvalidationAction.none;
   }
   if (wasBindingPreviously && !isBindingNow) {
@@ -264,8 +266,7 @@ class _MainScreenState extends State<MainScreen>
   // we only invalidate on id change and the libraries sidebar keeps
   // stale entries until the user switches profiles.
   bool _wasBindingPrev = false;
-  bool _hasPendingProfileSwitchInvalidation = false;
-  String? _pendingProfileSwitchInvalidationId;
+  bool _hadProfiles = false;
 
   /// Subscription to MultiServerManager status changes. Used to resume any
   /// queued downloads as soon as a Plex client comes online for the first
@@ -301,6 +302,7 @@ class _MainScreenState extends State<MainScreen>
     _offlineUntilConnected = widget.isOfflineMode;
 
     WidgetsBinding.instance.addObserver(this);
+    _contentFocusScope.addListener(_syncSidebarFocusWithContent);
 
     if (PlatformDetector.isDesktopOS()) {
       windowManager.addListener(this);
@@ -530,53 +532,27 @@ class _MainScreenState extends State<MainScreen>
       currentProfileId: id,
       wasBindingPreviously: _wasBindingPrev,
       isBindingNow: isBindingNow,
-      hasPendingProfileSwitchInvalidation: _hasPendingProfileSwitchInvalidation,
-      pendingProfileSwitchInvalidationId: _pendingProfileSwitchInvalidationId,
     );
+    _lastSeenProfileId = id;
+    _wasBindingPrev = isBindingNow;
 
-    if (action == ProfileInvalidationAction.waitForProfileSwitch) {
-      _lastSeenProfileId = id;
-      _wasBindingPrev = isBindingNow;
-      _hasPendingProfileSwitchInvalidation = true;
-      _pendingProfileSwitchInvalidationId = id;
-      // We're called inside the synchronous notify cascade *before* the
-      // binder's listener has fired (registration order). At this exact
-      // instant `_isBinding` is still false, so calling awaitBindingSettle
-      // here would resolve immediately. Hop to a microtask so the binder's
-      // listener gets to flip the flag first, then wait properly.
-      unawaited(
-        Future.microtask(() async {
-          final scheduledProfileId = id;
-          if (!mounted) return;
-          await activeProfile.awaitBindingSettle();
-          if (!mounted) return;
-          try {
-            if (_hasPendingProfileSwitchInvalidation &&
-                _pendingProfileSwitchInvalidationId == scheduledProfileId &&
-                activeProfile.activeId == scheduledProfileId) {
-              await _invalidateAllScreens();
-            }
-          } finally {
-            if (_hasPendingProfileSwitchInvalidation && _pendingProfileSwitchInvalidationId == scheduledProfileId) {
-              _hasPendingProfileSwitchInvalidation = false;
-              _pendingProfileSwitchInvalidationId = null;
-            }
-          }
-        }),
-      );
-      return;
+    // Re-arm the initial-profile prompt when profiles arrive late (e.g. a
+    // slow home-user fetch landing after the empty first snapshot) while
+    // nothing is active — otherwise the one-shot post-frame prompt has
+    // already passed and the user is stuck in a session with no picker.
+    final hasProfilesNow = activeProfile.profiles.isNotEmpty;
+    if (!_hadProfiles && hasProfilesNow && id == null && !_isShowingProfileSelection) {
+      unawaited(_promptForInitialProfileSelection());
     }
+    _hadProfiles = hasProfilesNow;
 
     // Same active id, but a rebind cycle for that profile just settled
     // (true → false transition). Fires after borrow / connection-removal
     // flows trigger ActiveProfileBinder.rebindIfActive, so the libraries
     // sidebar reflects the new server set without an app restart.
     if (action == ProfileInvalidationAction.invalidateNow) {
-      _wasBindingPrev = isBindingNow;
       unawaited(_invalidateAllScreens());
-      return;
     }
-    _wasBindingPrev = isBindingNow;
   }
 
   Future<void> _promptForInitialProfileSelection() async {
@@ -584,6 +560,7 @@ class _MainScreenState extends State<MainScreen>
     if (widget.initialPromptHandled) return;
 
     final activeProfile = context.read<ActiveProfileProvider>();
+    final connections = context.read<ConnectionRegistry>();
     // The provider's initialize() is fire-and-forget from MultiProvider —
     // wait for it to settle so `active` and `profiles` reflect storage
     // before we decide whether to prompt.
@@ -592,6 +569,20 @@ class _MainScreenState extends State<MainScreen>
 
     final settingsService = await SettingsService.getInstance();
     if (!mounted) return;
+
+    // Connections but ZERO resolvable profiles (e.g. the home-user fetch
+    // failed at sign-in): a session with nothing to select and no picker is
+    // a dead end. Mirror the boot guard — prune orphans and route to auth
+    // when nothing selectable remains.
+    if (activeProfile.active == null && activeProfile.profiles.isEmpty) {
+      // Offline, "unresolvable" may just be an unreachable plex.tv — don't
+      // kick the user to auth over it.
+      if (!widget.isOfflineMode && (await connections.list()).isNotEmpty && mounted) {
+        appLogger.w('MainScreen: connections exist but no profiles resolved — settling session');
+        await settleSessionAfterRemoval(SessionTeardownScope.of(context));
+      }
+      return;
+    }
 
     // Always prompt when there's no active profile but profiles exist
     // (fresh sign-in with multiple Plex Home users): otherwise the binder
@@ -649,9 +640,9 @@ class _MainScreenState extends State<MainScreen>
   void _setupWatchTogetherCallback() {
     try {
       final watchTogether = context.read<WatchTogetherProvider>();
-      watchTogether.onMediaSwitched = (ratingKey, serverId, mediaTitle) async {
+      watchTogether.onMediaSwitched = (ratingKey, serverId, mediaTitle) {
         appLogger.d('WatchTogether: Media switch received - navigating to $mediaTitle');
-        await _navigateToWatchTogetherMedia(ratingKey, serverId);
+        return _navigateToWatchTogetherMedia(ratingKey, serverId);
       };
       watchTogether.onHostExitedPlayer = () {
         appLogger.d('WatchTogether: Host exited player - exiting player for guest');
@@ -728,14 +719,17 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
-  /// Navigate to media when host switches content in Watch Together session
-  Future<void> _navigateToWatchTogetherMedia(String ratingKey, ServerId serverId) async {
-    if (!mounted) return; // Check before any context usage
+  /// Navigate to media when host switches content in Watch Together session.
+  /// Returns whether navigation was initiated; failures are re-dispatched on
+  /// the host's next state heartbeat.
+  Future<bool> _navigateToWatchTogetherMedia(String ratingKey, ServerId serverId) async {
+    if (!mounted) return false; // Check before any context usage
 
     try {
-      await navigateToWatchTogetherPlayback(context, ratingKey: ratingKey, serverId: serverId);
+      return await navigateToWatchTogetherPlayback(context, ratingKey: ratingKey, serverId: serverId);
     } catch (e) {
       appLogger.e('WatchTogether: Failed to navigate to media', error: e);
+      return false;
     }
   }
 
@@ -852,6 +846,7 @@ class _MainScreenState extends State<MainScreen>
     _startupSettleTimeout?.cancel();
     _startupSettleTimeout = null;
     _sidebarFocusScope.dispose();
+    _contentFocusScope.removeListener(_syncSidebarFocusWithContent);
     _contentFocusScope.dispose();
     _setTvosMenuPassthrough(false);
 
@@ -1131,6 +1126,15 @@ class _MainScreenState extends State<MainScreen>
     });
   }
 
+  /// _isSidebarFocused is hand-toggled; if anything moves real focus into the
+  /// content scope without going through _focusContent (e.g. a deferred
+  /// focusActiveTabIfReady), collapse the rail to match reality (#1411).
+  void _syncSidebarFocusWithContent() {
+    if (!mounted || !_isSidebarFocused || !_contentFocusScope.hasFocus) return;
+    setState(() => _isSidebarFocused = false);
+    _updateTvosMenuPassthrough();
+  }
+
   void _handleSidebarInteractionExpandedChanged(bool expanded) {
     if (_isSidebarInteractionExpanded == expanded) return;
     setState(() => _isSidebarInteractionExpanded = expanded);
@@ -1190,6 +1194,9 @@ class _MainScreenState extends State<MainScreen>
     final homeTab = tabs.first.id;
     if (_currentTab != homeTab) {
       _selectTab(homeTab);
+      // Keep the focus ring in step with the new selection; the sidebar scope
+      // already has focus, so no post-frame deferral is needed.
+      _sideNavKey.currentState?.focusHomeItem();
       _lastBackPressAt = null;
       return KeyEventResult.handled;
     }
@@ -1438,8 +1445,13 @@ class _MainScreenState extends State<MainScreen>
       if (newState case final TabVisibilityAware aware) {
         aware.onTabShown();
       }
-      if (newState case final FocusableTab focusable) {
-        focusable.focusActiveTabIfReady();
+      // Back-to-home keeps the sidebar focused (chain: content → sidebar →
+      // home → exit); stealing focus here left _isSidebarFocused stuck true
+      // while real focus sat on a content card (#1411).
+      if (!_isSidebarFocused) {
+        if (newState case final FocusableTab focusable) {
+          focusable.focusActiveTabIfReady();
+        }
       }
     }
 

@@ -1,4 +1,7 @@
 import '../media/media_backend.dart';
+import '../models/plex/plex_home_user.dart';
+import '../services/plex_auth_service.dart';
+import '../utils/url_utils.dart';
 
 import '../services/plex_auth_service.dart' show PlexServer;
 
@@ -67,7 +70,7 @@ class EmbyConnection extends Connection {
 
   EmbyConnection({
     required this.id,
-    required this.baseUrl,
+    required String baseUrl,
     List<String>? baseUrls,
     required this.serverName,
     required this.serverMachineId,
@@ -79,7 +82,8 @@ class EmbyConnection extends Connection {
     this.status = ConnectionStatus.unknown,
     required this.createdAt,
     this.lastAuthenticatedAt,
-  }) : baseUrls = _normalizeBaseUrls(baseUrl, baseUrls);
+  }) : baseUrl = canonicalizeBaseUrl(baseUrl),
+       baseUrls = _normalizeBaseUrls(baseUrl, baseUrls);
 
   @override
   ConnectionKind get kind => ConnectionKind.emby;
@@ -114,9 +118,9 @@ class EmbyConnection extends Connection {
     final seen = <String>{};
 
     void add(String url) {
-      final trimmed = url.trim();
-      if (trimmed.isEmpty || !seen.add(trimmed)) return;
-      result.add(trimmed);
+      final normalized = canonicalizeBaseUrl(url);
+      if (normalized.isEmpty || !seen.add(normalized)) return;
+      result.add(normalized);
     }
 
     add(activeBaseUrl);
