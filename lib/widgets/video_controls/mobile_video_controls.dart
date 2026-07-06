@@ -16,6 +16,7 @@ import 'widgets/play_pause_stream_builder.dart';
 import 'widgets/live_timeline_bar.dart';
 import 'widgets/video_controls_header.dart';
 import 'widgets/video_timeline_bar.dart';
+import 'emby_player_glass.dart';
 
 /// Mobile video controls layout for Plex video player
 ///
@@ -284,22 +285,11 @@ class _MobileVideoControlsState extends State<MobileVideoControls> with SingleTi
                           ignoring: t < 0.5,
                           child: Opacity(
                             opacity: (t * 2).clamp(0.0, 1.0),
-                            child: Container(
-                              padding: const EdgeInsets.only(top: 32),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Colors.black.withValues(alpha: 0.65),
-                                    Colors.black.withValues(alpha: 0.7),
-                                  ],
-                                  stops: const [0.0, 0.42, 1.0],
-                                ),
-                              ),
+                            child: EmbyPlayerGlassBar(
+                              margin: const EdgeInsets.fromLTRB(8, 24, 8, 8),
+                              padding: const EdgeInsets.only(top: 8, bottom: 8),
                               child: Column(
-                                mainAxisSize: .min,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   const Icon(Symbols.keyboard_arrow_down_rounded, color: Colors.white38, size: 20),
                                   const SizedBox(height: 4),
@@ -333,14 +323,17 @@ class _MobileVideoControlsState extends State<MobileVideoControls> with SingleTi
   Widget _buildTopBar(BuildContext context) {
     final topBar = _conditionalSafeArea(
       context: context,
-      bottom: false, // Only respect top safe area when in portrait
+      bottom: false,
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: VideoControlsHeader(
-          metadata: widget.metadata,
-          style: VideoHeaderStyle.multiLine,
-          trailing: widget.trackChapterControls,
-          onBack: widget.onBack,
+        padding: const EdgeInsets.all(12),
+        child: EmbyPlayerGlassBar(
+          minHeight: 52,
+          child: VideoControlsHeader(
+            metadata: widget.metadata,
+            style: VideoHeaderStyle.multiLine,
+            trailing: widget.trackChapterControls,
+            onBack: widget.onBack,
+          ),
         ),
       ),
     );
@@ -364,9 +357,13 @@ class _MobileVideoControlsState extends State<MobileVideoControls> with SingleTi
     return PlayPauseStreamBuilder(
       player: widget.player,
       builder: (context, isPlaying) {
-        return Row(
-          mainAxisAlignment: .center,
-          children: [
+        return EmbyPlayerGlassBar(
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
             if (!widget.isLive) ...[
               // Previous episode button (greyed out when unavailable)
               CircularControlButton(
@@ -402,6 +399,7 @@ class _MobileVideoControlsState extends State<MobileVideoControls> with SingleTi
               ),
             ],
           ],
+          ),
         );
       },
     );
@@ -447,22 +445,24 @@ class _MobileVideoControlsState extends State<MobileVideoControls> with SingleTi
   Widget _buildBottomBarContent(BuildContext context) {
     return _conditionalSafeArea(
       context: context,
-      top: false, // Only respect bottom safe area when in portrait
+      top: false,
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: VideoTimelineBar(
-          player: widget.player,
-          chapters: widget.chapters,
-          chaptersLoaded: widget.chaptersLoaded,
-          showChapterMarkersOnTimeline: widget.showChapterMarkersOnTimeline,
-          onSeek: widget.onSeek,
-          onSeekEnd: widget.onSeekEnd,
-          onScrubStart: widget.onScrubStart,
-          onScrubEnd: widget.onScrubEnd,
-          horizontalLayout: false,
-          enabled: widget.canControl,
-          showFinishTime: true,
-          thumbnailDataBuilder: widget.thumbnailDataBuilder,
+        padding: const EdgeInsets.all(12),
+        child: EmbyPlayerGlassBar(
+          child: VideoTimelineBar(
+            player: widget.player,
+            chapters: widget.chapters,
+            chaptersLoaded: widget.chaptersLoaded,
+            showChapterMarkersOnTimeline: widget.showChapterMarkersOnTimeline,
+            onSeek: widget.onSeek,
+            onSeekEnd: widget.onSeekEnd,
+            onScrubStart: widget.onScrubStart,
+            onScrubEnd: widget.onScrubEnd,
+            horizontalLayout: false,
+            enabled: widget.canControl,
+            showFinishTime: true,
+            thumbnailDataBuilder: widget.thumbnailDataBuilder,
+          ),
         ),
       ),
     );

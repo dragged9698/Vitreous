@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../../media/ids.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +15,9 @@ import '../../mixins/tab_navigation_mixin.dart';
 import '../../mixins/refreshable.dart';
 import '../../utils/grid_size_calculator.dart';
 import '../../utils/platform_detector.dart';
+import '../../theme/emby_glass_theme.dart';
+import '../../widgets/emby_glass_browse_shell.dart';
+import '../../widgets/emby_glass_chrome.dart';
 import '../../widgets/desktop_app_bar.dart';
 import '../../widgets/focusable_media_card.dart';
 import '../../widgets/media_grid_delegate.dart';
@@ -87,16 +91,50 @@ class DownloadsScreenState extends State<DownloadsScreen>
 
   Widget _buildAppBarTitle() {
     if (PlatformDetector.shouldUseSideNavigation(context)) {
-      return Row(
-        children: [
-          _buildTabChip(t.downloads.manage, 0),
-          const SizedBox(width: 8),
-          _buildTabChip(t.downloads.browse, 1),
+      return GlassSegmentedControl(
+        segments: [
+          GlassSegment(label: t.downloads.manage),
+          GlassSegment(label: t.downloads.browse),
         ],
+        selectedIndex: tabController.index,
+        quality: embyChromeGlassQuality(),
+        onSegmentSelected: (index) {
+          tabController.animateTo(index);
+          _focusCurrentTab();
+        },
       );
     }
     return Text(t.downloads.title);
   }
+
+  List<FocusableAction> _toolbarActions() => [
+        if (tabController.index == 1) ...[
+          FocusableAction(
+            icon: Symbols.sort_rounded,
+            tooltip: t.downloads.sortBy,
+            onPressed: _showSortPicker,
+          ),
+          FocusableAction(
+            icon: Symbols.filter_list_rounded,
+            tooltip: t.downloads.filterBy,
+            onPressed: _showFilterPicker,
+          ),
+        ],
+        FocusableAction(
+          icon: Symbols.rule_settings,
+          tooltip: t.downloads.activeSyncRules,
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SyncRulesScreen())),
+        ),
+      ];
+
+  List<Widget> _buildAppBarActions() => [
+        FocusableActionBar(
+          key: _actionBarKey,
+          onNavigateLeft: () => getTabChipFocusNode(tabCount - 1).requestFocus(),
+          onNavigateDown: _focusCurrentTab,
+          actions: _toolbarActions(),
+        ),
+      ];
 
   Future<void> _showSortPicker() async {
     final settings = SettingsService.instance;
@@ -151,10 +189,11 @@ class DownloadsScreenState extends State<DownloadsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: CustomScrollView(
-        primary: false,
-        slivers: [
+    final useGlassShell = PlatformDetector.shouldUseSideNavigation(context);
+    final scrollView = CustomScrollView(
+      primary: false,
+      slivers: [
+        if (!useGlassShell)
           DesktopSliverAppBar(
             title: _buildAppBarTitle(),
             floating: true,
@@ -163,91 +202,133 @@ class DownloadsScreenState extends State<DownloadsScreen>
             surfaceTintColor: Colors.transparent,
             shadowColor: Colors.transparent,
             scrolledUnderElevation: 0,
-            actions: [
-              FocusableActionBar(
-                key: _actionBarKey,
-                onNavigateLeft: () => getTabChipFocusNode(tabCount - 1).requestFocus(),
-                onNavigateDown: _focusCurrentTab,
-                actions: [
-                  if (tabController.index == 1) ...[
-                    FocusableAction(
-                      icon: Symbols.sort_rounded,
-                      tooltip: t.downloads.sortBy,
-                      onPressed: _showSortPicker,
+            actions: _buildAppBarActions(),
+          ),
+        SliverFillRemaining(
+          child: Column(
+            children: [
+              if (!useGlassShell)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  alignment: Alignment.centerLeft,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildTabChip(t.downloads.manage, 0),
+                        const SizedBox(width: 8),
+                        _buildTabChip(t.downloads.browse, 1),
+                      ],
                     ),
-                    FocusableAction(
-                      icon: Symbols.filter_list_rounded,
-                      tooltip: t.downloads.filterBy,
-                      onPressed: _showFilterPicker,
+                  ),
+                ),
+              Expanded(
+                child: TabBarView(
+                  controller: tabController,
+                  children: [
+                    Consumer2<DownloadProvider, MultiServerProvider>(
+                      builder: (context, downloadProvider, serverProvider, _) {
+                        getClient(String globalKey) {
+                          final serverId = parseGlobalKey(globalKey)?.serverId ?? globalKey;
+                          return serverProvider.serverManager.getClient(ServerId(serverId));
+                        }
+
+                        return DownloadTreeView(
+                          downloads: downloadProvider.downloads,
+                          metadata: downloadProvider.metadata,
+                          onPause: downloadProvider.pauseDownload,
+                          onResume: (globalKey) {
+                            final client = getClient(globalKey);
+                            if (client != null) downloadProvider.resumeDownload(globalKey, client);
+                          },
+                          onRetry: (globalKey) {
+                            final client = getClient(globalKey);
+                            if (client != null) downloadProvider.retryDownload(globalKey, client);
+                          },
+                          onCancel: downloadProvider.cancelDownload,
+                          onDelete: downloadProvider.deleteDownload,
+                          onNavigateLeft: () => MainScreenFocusScope.of(context, listen: false)?.focusSidebar(),
+                          onBack: focusTabBar,
+                          suppressAutoFocus: suppressAutoFocus,
+                        );
+                      },
+                    ),
+                    _DownloadsBrowseTab(
+                      selectedLibraryKey: _selectedLibraryKey,
+                      onLibrarySelected: (key) => setState(() => _selectedLibraryKey = key),
+                      suppressAutoFocus: suppressAutoFocus,
+                      onBack: focusTabBar,
                     ),
                   ],
-                  FocusableAction(
-                    icon: Symbols.rule_settings,
-                    tooltip: t.downloads.activeSyncRules,
-                    onPressed: () =>
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SyncRulesScreen())),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
-          SliverFillRemaining(
-            child: Column(
-              children: [
-                if (!PlatformDetector.shouldUseSideNavigation(context))
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    alignment: Alignment.centerLeft,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildTabChip(t.downloads.manage, 0),
-                          const SizedBox(width: 8),
-                          _buildTabChip(t.downloads.browse, 1),
-                        ],
-                      ),
-                    ),
-                  ),
-                Expanded(
-                  child: TabBarView(
-                    controller: tabController,
-                    children: [
-                      Consumer2<DownloadProvider, MultiServerProvider>(
-                        builder: (context, downloadProvider, serverProvider, _) {
-                          getClient(String globalKey) {
-                            final serverId = parseGlobalKey(globalKey)?.serverId ?? globalKey;
-                            return serverProvider.serverManager.getClient(ServerId(serverId));
-                          }
+        ),
+      ],
+    );
 
-                          return DownloadTreeView(
-                            downloads: downloadProvider.downloads,
-                            metadata: downloadProvider.metadata,
-                            onPause: downloadProvider.pauseDownload,
-                            onResume: (globalKey) {
-                              final client = getClient(globalKey);
-                              if (client != null) downloadProvider.resumeDownload(globalKey, client);
-                            },
-                            onRetry: (globalKey) {
-                              final client = getClient(globalKey);
-                              if (client != null) downloadProvider.retryDownload(globalKey, client);
-                            },
-                            onCancel: downloadProvider.cancelDownload,
-                            onDelete: downloadProvider.deleteDownload,
-                            onNavigateLeft: () => MainScreenFocusScope.of(context, listen: false)?.focusSidebar(),
-                            onBack: focusTabBar,
-                            suppressAutoFocus: suppressAutoFocus,
-                          );
-                        },
-                      ),
-                      _DownloadsBrowseTab(
-                        selectedLibraryKey: _selectedLibraryKey,
-                        onLibrarySelected: (key) => setState(() => _selectedLibraryKey = key),
-                        suppressAutoFocus: suppressAutoFocus,
-                        onBack: focusTabBar,
-                      ),
-                    ],
-                  ),
+    if (!useGlassShell) {
+      return Scaffold(body: scrollView);
+    }
+
+    return EmbyGlassBrowseShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          EmbyGlassPageToolbar(
+            leading: EmbyGlassSegmentedControl(
+              segments: [
+                GlassSegment(label: t.downloads.manage),
+                GlassSegment(label: t.downloads.browse),
+              ],
+              selectedIndex: tabController.index,
+              onSegmentSelected: (index) {
+                tabController.animateTo(index);
+                _focusCurrentTab();
+              },
+            ),
+            actionBarKey: _actionBarKey,
+            onNavigateLeft: () => getTabChipFocusNode(tabCount - 1).requestFocus(),
+            onNavigateDown: _focusCurrentTab,
+            actions: _toolbarActions(),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: tabController,
+              children: [
+                Consumer2<DownloadProvider, MultiServerProvider>(
+                  builder: (context, downloadProvider, serverProvider, _) {
+                    getClient(String globalKey) {
+                      final serverId = parseGlobalKey(globalKey)?.serverId ?? globalKey;
+                      return serverProvider.serverManager.getClient(ServerId(serverId));
+                    }
+
+                    return DownloadTreeView(
+                      downloads: downloadProvider.downloads,
+                      metadata: downloadProvider.metadata,
+                      onPause: downloadProvider.pauseDownload,
+                      onResume: (globalKey) {
+                        final client = getClient(globalKey);
+                        if (client != null) downloadProvider.resumeDownload(globalKey, client);
+                      },
+                      onRetry: (globalKey) {
+                        final client = getClient(globalKey);
+                        if (client != null) downloadProvider.retryDownload(globalKey, client);
+                      },
+                      onCancel: downloadProvider.cancelDownload,
+                      onDelete: downloadProvider.deleteDownload,
+                      onNavigateLeft: () => MainScreenFocusScope.of(context, listen: false)?.focusSidebar(),
+                      onBack: focusTabBar,
+                      suppressAutoFocus: suppressAutoFocus,
+                    );
+                  },
+                ),
+                _DownloadsBrowseTab(
+                  selectedLibraryKey: _selectedLibraryKey,
+                  onLibrarySelected: (key) => setState(() => _selectedLibraryKey = key),
+                  suppressAutoFocus: suppressAutoFocus,
+                  onBack: focusTabBar,
                 ),
               ],
             ),

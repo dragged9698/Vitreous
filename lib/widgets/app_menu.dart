@@ -4,12 +4,14 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../focus/dpad_navigator.dart';
 import '../focus/focusable_tile_mixin.dart';
 import '../focus/input_mode_tracker.dart';
 import '../focus/key_event_utils.dart';
+import '../theme/emby_glass_theme.dart';
 import '../theme/mono_tokens.dart';
 import '../utils/focus_utils.dart';
 import 'app_icon.dart';
@@ -316,7 +318,7 @@ class _AppMenuListState<T> extends State<AppMenuList<T>> {
                   return widget.focusFirstItem;
                 }(),
               ),
-              AppMenuDivider<T>() => const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider()),
+              AppMenuDivider<T>() => const GlassMenuDivider(),
               AppMenuHeader<T>() => _AppMenuHeaderTile(entry: entry),
               _ => const SizedBox.shrink(),
             },
@@ -668,22 +670,22 @@ class _AppMenuSurface<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final surface = Color.alphaBlend(colorScheme.onSurface.withValues(alpha: 0.08), colorScheme.surface);
-    return Material(
-      elevation: 3,
-      shadowColor: colorScheme.shadow,
-      color: surface,
+    return ClipRRect(
       borderRadius: BorderRadius.circular(tokens(context).radiusMd),
-      clipBehavior: Clip.antiAlias,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minWidth: width, maxWidth: width, maxHeight: maxHeight),
-        child: PrimaryScrollController.none(
-          child: SingleChildScrollView(
-            child: AppMenuList<T>(
-              entries: entries,
-              focusFirstItem: focusFirstItem,
-              onSelected: (value) => Navigator.pop(context, value),
+      child: GlassContainer(
+        useOwnLayer: true,
+        quality: embyChromeGlassQuality(),
+        settings: embyChromeGlassSettings(context),
+        shape: LiquidRoundedSuperellipse(borderRadius: tokens(context).radiusMd),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: width, maxWidth: width, maxHeight: maxHeight),
+          child: PrimaryScrollController.none(
+            child: SingleChildScrollView(
+              child: AppMenuList<T>(
+                entries: entries,
+                focusFirstItem: focusFirstItem,
+                onSelected: (value) => Navigator.pop(context, value),
+              ),
             ),
           ),
         ),

@@ -6,26 +6,47 @@ alwaysApply: false
 
 # Liquid Glass UI (`liquid_glass_widgets`)
 
-**Exclusive UI kit** for the upcoming rewrite. Package: [sdegenaar/liquid_glass_widgets](https://github.com/sdegenaar/liquid_glass_widgets) (pub: `liquid_glass_widgets`).
+**Exclusive UI kit** for the navigation chrome retheme. Package: [sdegenaar/liquid_glass_widgets](https://github.com/sdegenaar/liquid_glass_widgets) (pub: `liquid_glass_widgets`).
 
-Requires **Flutter ≥ 3.41** (project already on 3.44+). Query **Context7** for `liquid_glass_widgets` before guessing widget APIs.
+Requires **Flutter ≥ 3.41** (project on 3.44+). Query **Context7** before guessing widget APIs.
+
+**Do not use `liquid_glass_easy`.** Its metaball shaders fail SkSL compilation on Linux desktop (Skia default renderer). All glass chrome uses `liquid_glass_widgets` only — `AdaptiveGlass`, `GlassContainer`, `GlassScaffold`, etc.
+
+## Linux / Skia compatibility
+
+| Surface | Linux desktop (Skia) |
+|---------|----------------------|
+| App bars, tab bars, side rail shell | `GlassQuality.standard` — lightweight shader path |
+| Side nav chrome | `GlassContainer` + `embyChromeGlassSettings()` |
+| Premium shaders | Impeller-only — auto-capped by `adaptiveQuality` |
+
+Project wires glass via `LiquidGlassWidgets.wrap()` + `loadEmbyGlassAdaptiveConfig()` in `main.dart`. See `lib/theme/emby_glass_theme.dart`.
+
+## Vitreous refraction pipeline (Impeller / Vulkan)
+
+Custom shader path in `lib/graphics/` — **requires Impeller** (`flutter run -d linux --enable-impeller`).
+
+| Component | Role |
+|-----------|------|
+| `VitreousGlassShader` | Loads `shaders/vitreous_glass.frag`, binds `ui.Image` sampler |
+| `RefractionController` | `RepaintBoundary.toImage(Sync)` snapshot management |
+| `VitreousGlassHost` | Wraps opaque main content for backdrop capture |
+| `VitreousGlassSurface` | Shader-only chrome layer (side rail) |
+| `liquid_glass_widgets` | Structural chrome when Impeller off or for tab bars |
+
+Do **not** use `BackdropFilter` for refraction on Linux. Falls back to `GlassContainer` when Impeller unavailable.
 
 ## Setup (app root — once)
 
 ```dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await LiquidGlassWidgets.initialize(); // pre-warm shaders — avoids first-frame flash
+  await LiquidGlassWidgets.initialize();
+  final glassAdaptiveConfig = await loadEmbyGlassAdaptiveConfig();
 
-  // Inside Sentry/runApp wrapper:
-  runApp(LiquidGlassWidgets.wrap(
+  runApp(embyGlassWrapApp(
+    adaptiveConfig: glassAdaptiveConfig,
     child: const EmbyPlayerApp(),
-    adaptiveQuality: true, // experimental — persist settled quality via SettingsService (see below)
-    theme: GlassThemeData.simple(
-      blur: 10,
-      thickness: 30,
-      quality: GlassQuality.standard,
-    ),
   ));
 }
 ```
@@ -81,13 +102,16 @@ GlassScaffold(
 
 | Need | Widget |
 |------|--------|
-| Screen with app bar / tab bar | **`GlassScaffold`** (default) |
+| Screen with app bar / tab bar | **`GlassScaffold`** or **`EmbyGlassScrollScaffold`** (settings pilot) |
+| Side nav shell chrome | **`GlassContainer`** (`embyChromeGlassSettings`) — chrome only |
+| Bottom navigation (mobile) | **`GlassTabBar.bottom`** |
+| In-page library tabs (mobile) | **`GlassSegmentedControl`** |
 | Custom stack layout (main shell + side rail) | **`GlassPage`** + manual `Stack`, or extend shell widget |
 | Modal / picker | **`GlassSheet`**, **`GlassModalSheet`**, **`GlassDialog`** |
 | Context menu | **`GlassMenu`** + **`GlassMenuItem`** (Liquid Morph engine) |
 | Toolbar actions | **`GlassButton`**, **`GlassIconButton`**, **`GlassButtonGroup`** |
 | Search | **`GlassSearchBar`** or **`GlassTabBar.searchable()`** |
-| Low-level one-off glass panel | **`GlassCard`** / **`GlassContainer`** — not the default for whole screens |
+| Low-level one-off glass panel | **`GlassCard`** / **`GlassContainer`** / **`AdaptiveGlass`** — not the default for whole screens |
 
 Do **not** assemble `GlassPage` + `Scaffold` + `GlassScrollEdgeEffect` + `Stack` manually when `GlassScaffold` covers the case.
 
@@ -96,8 +120,8 @@ Do **not** assemble `GlassPage` + `Scaffold` + `GlassScrollEdgeEffect` + `Stack`
 | Current surface | Target | Notes |
 |-----------------|--------|-------|
 | `MainScreen` shell | `GlassScaffold` or `GlassPage` + opaque body | Keep provider/focus logic; swap chrome |
-| `SideNavigationRail` | Glass sidebar chrome + **opaque** `NavigationRailItem` content | Preserve `DpadNavigator` / focus nodes — glass wraps chrome, not focus target internals |
-| `SettingsPage` / `FocusedScrollScaffold` | `GlassScaffold` + `GlassAppBar` + opaque sliver list | Rows stay Material/Cupertino |
+| `SideNavigationRail` | `GlassContainer` sidebar chrome + **opaque** `NavigationRailItem` content | Preserve `DpadNavigator` / focus nodes — glass wraps chrome, not focus target internals |
+| `SettingsPage` / `FocusedScrollScaffold` | `EmbyGlassScrollScaffold` + `GlassAppBar` + opaque sliver list | Rows stay Material/Cupertino |
 | `MediaCard`, `EpisodeCard`, grids | **No glass** — keep opaque cards | Use `MonoTokens` / `Theme` |
 | `video_player` screen | **Opaque** player + optional glass **overlay** controls only | Never glass the video texture |
 | `OverlaySheet`, bottom sheets | `GlassModalSheet` / `GlassSheet` | Migrate gradually |
@@ -124,6 +148,7 @@ Enable `adaptiveQuality: true` in `wrap()`; persist settled tier to avoid 3s war
 - Opaque content: keep **`MonoTokens`** / `ThemeExtension` for surfaces, text, radii on cards and lists.
 - Override hierarchy (highest wins): widget `settings` → `GlassPage(themeOverride:)` → `wrap(theme:)`.
 - Per-subtree: `GlassTheme(data: GlassThemeData.simple(...), child: ...)`.
+- Side rail chrome: `embyChromeGlassSettings(context)` in `lib/theme/emby_glass_theme.dart`.
 
 Do not duplicate color hex in glass widgets — use `GlassThemeData` + `GlassGlowColors` for interaction glow on bars.
 
@@ -137,7 +162,7 @@ Do not duplicate color hex in glass widgets — use `GlassThemeData` + `GlassGlo
 ## Migration rules
 
 1. **Chrome first** — `main.dart` wrap + one pilot screen (`SettingsPage` or library hub).
-2. **Extract shared shell** — e.g. `EmbyGlassShell` wrapping `GlassScaffold` with backdrop + tab bar wiring.
+2. **Extract shared shell** — `EmbyGlassScrollScaffold` wrapping `GlassScaffold` with backdrop + tab bar wiring.
 3. **Leave providers/services untouched** — UI-only diff per screen.
 4. **Delete replaced scaffolds** only after all call sites migrate (`FocusedScrollScaffold`, duplicate app bars).
 5. Reference package examples: `example/lib/demos/nav_bar_patterns_demo.dart`, `content_aware_brightness_demo.dart`, Apple News demo (article tiles = opaque).
@@ -148,10 +173,11 @@ Do not duplicate color hex in glass widgets — use `GlassThemeData` + `GlassGlo
 **Interactive:** `GlassButton`, `GlassIconButton`, `GlassSegmentedControl`, `GlassSwitch`, `GlassSlider`, `GlassChip`  
 **Input:** `GlassTextField`, `GlassSearchBar`, `GlassPicker`  
 **Overlays:** `GlassDialog`, `GlassSheet`, `GlassModalSheet`, `GlassMenu`, `showGlassActionSheet`  
-**Containers (sparingly):** `GlassCard`, `GlassGroupedSection`, `GlassListTile` — not for media grids
+**Containers (sparingly):** `GlassCard`, `GlassGroupedSection`, `GlassListTile`, `GlassContainer`, `AdaptiveGlass` — not for media grids
 
 ## Forbidden
 
+- **`liquid_glass_easy`** — metaball shaders break Linux Skia; never add to pubspec
 - `GlassCard` / `GlassContainer` wrapping **`MediaCard`** or poster grids
 - Glass on **`Player` / video texture** / MPV overlay background
 - Raw `Scaffold` with transparent background on new screens — use `GlassScaffold`

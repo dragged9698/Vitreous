@@ -159,25 +159,51 @@ mixin _EmbyPlaybackMethods on MediaServerCacheMixin {
     TranscodeFallbackReason? fallbackReason;
 
     final preset = options.qualityPreset;
+    final mustDirectStream = embySourceMustDirectStream(bundle.selectedSource);
+    final bundleDirect = embyBundleSupportsDirectPlayback(bundle.selectedSource);
     final requestedAudioStreamId = _validEmbyAudioStreamId(options.selectedAudioStreamId, mediaInfo);
-    final int? maxStreamingBitrate = preset.isOriginal ? null : (preset.videoBitrateKbps ?? 100_000) * 1000;
+    final int? maxStreamingBitrate = (preset.isOriginal || mustDirectStream)
+        ? embyOriginalPlaybackBitrate
+        : (preset.videoBitrateKbps ?? 100_000) * 1000;
     final resumeOffsetMs = metadata.viewOffsetMs;
     final int? transcodeStartTimeTicks = !preset.isOriginal && resumeOffsetMs != null && resumeOffsetMs > 0
         ? msToEmbyTicks(resumeOffsetMs)
         : null;
+    logEmbyPlayback('start', {
+      'itemId': metadata.id,
+      'title': metadata.title,
+      'qualityPreset': preset.name,
+      'qualityIsOriginal': preset.isOriginal,
+      'mustDirectStream': mustDirectStream,
+      'bundleDirect': bundleDirect,
+      'maxStreamingBitrate': maxStreamingBitrate,
+      'mediaSourceId': bundle.selectedSourceId,
+      'resumeOffsetMs': resumeOffsetMs,
+      'transcodeStartTimeTicks': transcodeStartTimeTicks,
+      'bundleSource': embyMediaSourceDebugFields(bundle.selectedSource),
+    });
     final negotiation = await getPlaybackInfo(
       metadata.id,
       maxStreamingBitrate: maxStreamingBitrate,
       mediaSourceId: bundle.selectedSourceId,
       startTimeTicks: transcodeStartTimeTicks,
       audioStreamIndex: requestedAudioStreamId,
+      autoOpenLiveStream: true,
     );
+    String? decisionBranch;
     if (negotiation == null) {
+      logEmbyPlayback('negotiation-failed', {'itemId': metadata.id});
       if (!preset.isOriginal) {
         fallbackReason = TranscodeFallbackReason.decisionFailed;
       }
     } else {
       final chosenSource = _selectNegotiatedMediaSource(negotiation['MediaSources'], bundle.selectedSourceId);
+      logEmbyPlayback('negotiated', {
+        'itemId': metadata.id,
+        'playSessionId': negotiation['PlaySessionId'] != null ? '(set)' : null,
+        'sourceCount': negotiation['MediaSources'] is List ? (negotiation['MediaSources'] as List).length : 0,
+        'chosenSource': chosenSource == null ? null : embyMediaSourceDebugFields(chosenSource),
+      });
       if (chosenSource != null) {
         effectiveSourceId = chosenSource['Id'] as String? ?? effectiveSourceId;
         effectiveContainer = chosenSource['Container'] as String? ?? effectiveContainer;
@@ -190,6 +216,49 @@ mixin _EmbyPlaybackMethods on MediaServerCacheMixin {
         }
 
         final negotiatedPlaySessionId = negotiation['PlaySessionId'];
+        if (negotiatedPlaySessionId is String && negotiatedPlaySessionId.isNotEmpty) {
+          playSessionId = negotiatedPlaySessionId;
+        }
+
+        var streamSource = enrichEmbyMediaSource(chosenSource, bundle.selectedSource);
+        logEmbyPlayback('enriched-source', {
+          'itemId': metadata.id,
+          'needsLiveStreamOpen': embySourceNeedsLiveStreamOpen(streamSource),
+          'source': embyMediaSourceDebugFields(streamSource),
+        });
+        if (embySourceNeedsLiveStreamOpen(streamSource)) {
+          final opened = await _openRequiresOpeningStream(
+            itemId: metadata.id,
+            playSessionId: playSessionId ?? '',
+            source: streamSource,
+            maxStreamingBitrate: maxStreamingBitrate,
+            startTimeTicks: transcodeStartTimeTicks,
+            audioStreamIndex: requestedAudioStreamId,
+          );
+          if (opened != null) {
+            streamSource = opened;
+            effectiveSourceId = opened['Id'] as String? ?? effectiveSourceId;
+            effectiveContainer = opened['Container'] as String? ?? effectiveContainer;
+            if (opened['MediaStreams'] is List) {
+              mediaInfo = embyMediaSourceToMediaSourceInfo(
+                opened,
+                chapters: bundle.chapters,
+                trickplay: bundle.trickplay,
+              );
+            }
+            logEmbyPlayback('live-stream-opened', {
+              'itemId': metadata.id,
+              'source': embyMediaSourceDebugFields(opened),
+            });
+          } else {
+            logEmbyPlayback('live-stream-open-failed', {
+              'itemId': metadata.id,
+              'playSessionId': playSessionId != null ? '(set)' : null,
+              'hasOpenToken': streamSource['OpenToken'] != null,
+            });
+          }
+        }
+
         void capturePlaySessionId(String urlOrPath) {
           playSessionId = Uri.tryParse(urlOrPath)?.queryParameters['PlaySessionId'];
           if ((playSessionId == null || playSessionId!.isEmpty) && negotiatedPlaySessionId is String) {
@@ -197,40 +266,98 @@ mixin _EmbyPlaybackMethods on MediaServerCacheMixin {
           }
         }
 
-        final transcodingUrl = chosenSource['TranscodingUrl'];
-        final directStreamUrl = chosenSource['DirectStreamUrl'];
-        final supportsDirectStream = embySourceSupportsDirectStream(chosenSource);
-        final staticStream = embySourcePrefersStaticStream(chosenSource);
-        if (!preset.isOriginal && transcodingUrl is String && transcodingUrl.isNotEmpty) {
-          // User-requested quality cap — honour the negotiated transcode profile.
-          capturePlaySessionId(transcodingUrl);
-          videoUrl = _withApiKey(transcodingUrl);
+        final transcodingUrl = streamSource['TranscodingUrl'];
+        final directStreamUrl = streamSource['DirectStreamUrl'];
+        final supportsDirectStream = embySourceSupportsDirectStream(streamSource);
+        final staticStream = embySourcePrefersStaticStream(streamSource);
+        final forceDirect = mustDirectStream || embySourceMustDirectStream(streamSource);
+        final preferItemDirect = preset.isOriginal && bundleDirect;
+        final progressiveDirectUrl = embyIsProgressiveDirectStreamUrl(directStreamUrl as String?)
+            ? directStreamUrl as String
+            : null;
+        final hlsTranscodeUrl = embyPickHlsTranscodeUrl(transcodingUrl, directStreamUrl);
+
+        if (forceDirect && bundleDirect) {
+          decisionBranch = 'built-direct-stream-virtual';
+          final built = buildDirectStreamUrl(
+            metadata.id,
+            container: effectiveContainer,
+            mediaSourceId: effectiveSourceId,
+            playSessionId: playSessionId,
+            liveStreamId: streamSource['LiveStreamId'] as String?,
+            staticStream: staticStream,
+          );
+          capturePlaySessionId(built);
+          videoUrl = built;
+          playMethod = 'DirectStream';
+        } else if (!preset.isOriginal && hlsTranscodeUrl != null) {
+          decisionBranch = 'quality-capped-transcode';
+          capturePlaySessionId(hlsTranscodeUrl);
+          videoUrl = _withApiKey(embyWithTranscodeStartTimeTicks(hlsTranscodeUrl, transcodeStartTimeTicks));
           playMethod = 'Transcode';
           isTranscoding = true;
           includeExternalSubtitleDelivery = true;
-        } else if (supportsDirectStream && directStreamUrl is String && directStreamUrl.isNotEmpty) {
-          capturePlaySessionId(directStreamUrl);
-          videoUrl = _withApiKey(sanitizeMediaBrowserDirectStreamUrl(directStreamUrl, staticStream: staticStream));
+        } else if (progressiveDirectUrl != null && supportsDirectStream) {
+          decisionBranch = 'negotiated-direct-stream-url';
+          capturePlaySessionId(progressiveDirectUrl);
+          videoUrl = _withApiKey(sanitizeMediaBrowserDirectStreamUrl(progressiveDirectUrl, staticStream: staticStream));
           playMethod = 'DirectStream';
-          appLogger.i(
-            'Emby direct stream',
-            error: {
-              'static': staticStream,
-              'requiresOpening': chosenSource['RequiresOpening'],
-              'size': chosenSource['Size'],
-            },
+        } else if (preferItemDirect) {
+          decisionBranch = 'item-metadata-direct-stream';
+          final built = buildDirectStreamUrl(
+            metadata.id,
+            container: effectiveContainer,
+            mediaSourceId: effectiveSourceId,
+            playSessionId: playSessionId,
+            liveStreamId: streamSource['LiveStreamId'] as String?,
+            staticStream: staticStream,
           );
+          capturePlaySessionId(built);
+          videoUrl = built;
+          playMethod = 'DirectStream';
+        } else if (supportsDirectStream || bundleDirect) {
+          decisionBranch = 'built-direct-stream-fallback';
+          videoUrl = buildDirectStreamUrl(
+            metadata.id,
+            container: effectiveContainer,
+            mediaSourceId: effectiveSourceId,
+            playSessionId: playSessionId,
+            liveStreamId: streamSource['LiveStreamId'] as String?,
+            staticStream: staticStream,
+          );
+          playMethod = 'DirectStream';
         } else if (transcodingUrl is String && transcodingUrl.isNotEmpty) {
+          decisionBranch = 'transcode-no-direct';
           capturePlaySessionId(transcodingUrl);
-          videoUrl = _withApiKey(transcodingUrl);
+          videoUrl = _withApiKey(embyWithTranscodeStartTimeTicks(transcodingUrl, transcodeStartTimeTicks));
           playMethod = 'Transcode';
           isTranscoding = true;
           includeExternalSubtitleDelivery = true;
         } else if (!preset.isOriginal) {
+          decisionBranch = 'no-url-quality-fallback';
           fallbackReason = TranscodeFallbackReason.directPlayOnly;
+        } else {
+          decisionBranch = 'no-url';
         }
+        logEmbyPlayback('decision', {
+          'itemId': metadata.id,
+          'branch': decisionBranch,
+          'forceDirect': forceDirect,
+          'staticStream': staticStream,
+          'supportsDirectStream': supportsDirectStream,
+          'bundleDirect': bundleDirect,
+          'preferItemDirect': preferItemDirect,
+          'streamSource': embyMediaSourceDebugFields(streamSource),
+          'resolved': embyResolvedUrlDebugFields(videoUrl),
+        });
       } else if (!preset.isOriginal) {
+        decisionBranch = 'no-chosen-source';
         fallbackReason = TranscodeFallbackReason.directPlayOnly;
+        logEmbyPlayback('decision', {
+          'itemId': metadata.id,
+          'branch': decisionBranch,
+          'resolved': embyResolvedUrlDebugFields(videoUrl),
+        });
       }
     }
 
@@ -244,24 +371,38 @@ mixin _EmbyPlaybackMethods on MediaServerCacheMixin {
     );
     final pinnedSourceId = bundle.pinnedSourceIdForItem(metadata.id);
     if (videoUrl == null && embySourceSupportsDirectStream(bundle.selectedSource)) {
-      final staticStream = embySourcePrefersStaticStream(bundle.selectedSource);
+      decisionBranch = 'post-negotiation-bundle-fallback';
+      var streamSource = bundle.selectedSource;
+      if (embySourceNeedsLiveStreamOpen(bundle.selectedSource)) {
+        final opened = await _openRequiresOpeningStream(
+          itemId: metadata.id,
+          playSessionId: playSessionId ?? '',
+          source: bundle.selectedSource,
+          maxStreamingBitrate: maxStreamingBitrate,
+          startTimeTicks: transcodeStartTimeTicks,
+          audioStreamIndex: requestedAudioStreamId,
+        );
+        if (opened != null) streamSource = opened;
+      }
+      final staticStream = embySourcePrefersStaticStream(streamSource);
       videoUrl = buildDirectStreamUrl(
         metadata.id,
         container: effectiveContainer,
         mediaSourceId: pinnedSourceId ?? bundle.selectedSourceId,
         playSessionId: playSessionId,
+        liveStreamId: streamSource['LiveStreamId'] as String?,
         staticStream: staticStream,
       );
       playMethod = 'DirectStream';
-      appLogger.i(
-        'Emby direct stream fallback',
-        error: {
-          'static': staticStream,
-          'requiresOpening': bundle.selectedSource['RequiresOpening'],
-          'size': bundle.selectedSource['Size'],
-        },
-      );
+      logEmbyPlayback('decision', {
+        'itemId': metadata.id,
+        'branch': decisionBranch,
+        'staticStream': staticStream,
+        'streamSource': embyMediaSourceDebugFields(streamSource),
+        'resolved': embyResolvedUrlDebugFields(videoUrl),
+      });
     } else if (videoUrl == null && embySourceNeedsTranscode(bundle.selectedSource)) {
+      decisionBranch = 'forced-transcode';
       final forced = await getPlaybackInfo(
         metadata.id,
         maxStreamingBitrate: maxStreamingBitrate,
@@ -278,12 +419,28 @@ mixin _EmbyPlaybackMethods on MediaServerCacheMixin {
       final forcedUrl = forcedSource?['TranscodingUrl'];
       if (forcedUrl is String && forcedUrl.isNotEmpty) {
         playSessionId = forced?['PlaySessionId'] as String?;
-        videoUrl = _withApiKey(forcedUrl);
+        videoUrl = _withApiKey(embyWithTranscodeStartTimeTicks(forcedUrl, transcodeStartTimeTicks));
         playMethod = 'Transcode';
         isTranscoding = true;
         includeExternalSubtitleDelivery = true;
+        logEmbyPlayback('decision', {
+          'itemId': metadata.id,
+          'branch': decisionBranch,
+          'resolved': embyResolvedUrlDebugFields(videoUrl),
+        });
       }
     }
+
+    logEmbyPlayback('resolved', {
+      'itemId': metadata.id,
+      'title': metadata.title,
+      'branch': decisionBranch ?? '(none)',
+      'playMethod': playMethod,
+      'isTranscoding': isTranscoding,
+      'qualityPreset': preset.name,
+      'fallbackReason': fallbackReason?.name,
+      'resolved': embyResolvedUrlDebugFields(videoUrl),
+    });
 
     return PlaybackInitializationResult(
       availableVersions: bundle.availableVersions,
@@ -490,6 +647,100 @@ mixin _EmbyPlaybackMethods on MediaServerCacheMixin {
     );
   }
 
+  /// Device profile shared by PlaybackInfo and LiveStreams/Open.
+  Map<String, Object?> _embyPlaybackDeviceProfile({int? maxStreamingBitrate}) => {
+    'Name': 'Vitreous',
+    'MaxStreamingBitrate': ?maxStreamingBitrate,
+    'CodecProfiles': const <Map<String, Object?>>[],
+    'TranscodingProfiles': const <Map<String, Object?>>[
+      {
+        'Type': 'Video',
+        'Container': 'ts',
+        'Protocol': 'hls',
+        'VideoCodec': 'hevc,h264',
+        'AudioCodec': 'aac,mp3,ac3,eac3,flac,opus',
+      },
+    ],
+    'DirectPlayProfiles': const <Map<String, Object?>>[
+      {
+        'Type': 'Video',
+        'Container': 'mp4,mkv,m4v,webm,mov,ts',
+        'VideoCodec': 'hevc,h264,h265,vp8,vp9,av1,mpeg4,mpeg2video',
+        'AudioCodec': 'aac,mp3,mp2,ac3,eac3,flac,opus,vorbis,dts',
+      },
+    ],
+    'SubtitleProfiles': const <Map<String, Object?>>[
+      {'Format': 'srt', 'Method': 'External'},
+      {'Format': 'ass', 'Method': 'External'},
+      {'Format': 'ssa', 'Method': 'External'},
+      {'Format': 'vtt', 'Method': 'External'},
+      {'Format': 'pgssub', 'Method': 'External'},
+      {'Format': 'dvdsub', 'Method': 'External'},
+      {'Format': 'dvbsub', 'Method': 'External'},
+    ],
+  };
+
+  /// Opens virtual/symlink mounts (decypharr, etc.) before streaming — mirrors
+  /// the official Emby Kodi plugin's `getLiveStream` call.
+  Future<Map<String, dynamic>?> _openRequiresOpeningStream({
+    required String itemId,
+    required String playSessionId,
+    required Map<String, dynamic> source,
+    int? maxStreamingBitrate,
+    int? startTimeTicks,
+    int? audioStreamIndex,
+  }) async {
+    final openToken = source['OpenToken'] as String?;
+    if (openToken == null || openToken.isEmpty) {
+      logEmbyPlayback('live-stream-open-skipped', {
+        'itemId': itemId,
+        'reason': 'no-open-token',
+        'path': source['Path'],
+        'requiresOpening': source['RequiresOpening'],
+      });
+      return null;
+    }
+    if (playSessionId.isEmpty) {
+      logEmbyPlayback('live-stream-open-skipped', {
+        'itemId': itemId,
+        'reason': 'no-play-session-id',
+      });
+      return null;
+    }
+    try {
+      final response = await _http.post(
+        '/LiveStreams/Open',
+        body: {
+          'UserId': connection.userId,
+          'PlaySessionId': playSessionId,
+          'OpenToken': openToken,
+          'ItemId': itemId,
+          'StartTimeTicks': ?startTimeTicks,
+          'AudioStreamIndex': ?audioStreamIndex,
+          'MaxStreamingBitrate': ?maxStreamingBitrate,
+          'EnableDirectPlay': true,
+          'EnableDirectStream': true,
+          'EnableTranscoding': true,
+          'AllowVideoStreamCopy': true,
+          'AllowAudioStreamCopy': true,
+          'DeviceProfile': _embyPlaybackDeviceProfile(maxStreamingBitrate: maxStreamingBitrate),
+        },
+      );
+      throwIfHttpError(response);
+      final data = response.data;
+      if (data is! Map<String, dynamic>) return null;
+      final mediaSource = data['MediaSource'];
+      return mediaSource is Map<String, dynamic> ? mediaSource : null;
+    } catch (e, st) {
+      logEmbyPlayback('live-stream-open-error', {
+        'itemId': itemId,
+        'error': e.toString(),
+      });
+      appLogger.w('EmbyClient: LiveStreams/Open failed', error: e, stackTrace: st);
+      return null;
+    }
+  }
+
   /// Negotiate playback: returns the parsed `MediaSources[]` array and the
   /// server's recommended `PlaySessionId`. Caller decides which media source
   /// to use and feeds the returned `TranscodingUrl` into the player.
@@ -500,9 +751,10 @@ mixin _EmbyPlaybackMethods on MediaServerCacheMixin {
   /// to avoid capping high-bitrate files. [mediaSourceId] pins the negotiation
   /// to a specific version when the item has multiple sources.
   /// [startTimeTicks] is forwarded to Emby's playback negotiation for
-  /// resume-aware stream metadata. Our video transcode profile is HLS, and
-  /// Emby omits `StartTimeTicks` from the returned HLS URL, so the player
-  /// still performs the initial seek.
+  /// resume-aware stream metadata. Our video transcode profile is HLS; Emby
+  /// may return a stale `StartTimeTicks` on the URL when renegotiating over an
+  /// active session, so [embyWithTranscodeStartTimeTicks] overwrites it before
+  /// open. The player does not seek Emby transcodes — it uses timeline offset.
   /// [audioStreamIndex] / [subtitleStreamIndex] tell the server which streams
   /// to pick for the transcode profile (Emby's negotiation factors them in
   /// when picking codec compatibility).
@@ -554,46 +806,7 @@ mixin _EmbyPlaybackMethods on MediaServerCacheMixin {
           'EnableTranscoding': ?enableTranscoding,
           'AllowVideoStreamCopy': ?allowVideoStreamCopy,
           'AllowAudioStreamCopy': ?allowAudioStreamCopy,
-          'DeviceProfile': <String, Object?>{
-            'Name': 'Plezy',
-            'MaxStreamingBitrate': ?maxStreamingBitrate,
-            'CodecProfiles': const <Map<String, Object?>>[],
-            // Comma-separated codec lists are order-sensitive — first entry
-            // wins when the server picks an output codec. HEVC is listed
-            // ahead of H.264 so a server that has "Allow encoding in HEVC
-            // format" enabled will actually emit HEVC instead of falling
-            // back to H.264.
-            'TranscodingProfiles': const <Map<String, Object?>>[
-              {
-                'Type': 'Video',
-                'Container': 'ts',
-                'Protocol': 'hls',
-                'VideoCodec': 'hevc,h264',
-                'AudioCodec': 'aac,mp3,ac3,eac3,flac,opus',
-              },
-            ],
-            // Declaring HEVC in DirectPlayProfile.VideoCodec stops the server
-            // from forcing a transcode for HEVC sources whose container we
-            // already accept — mpv decodes HEVC natively on every platform
-            // we ship.
-            'DirectPlayProfiles': const <Map<String, Object?>>[
-              {
-                'Type': 'Video',
-                'Container': 'mp4,mkv,m4v,webm,mov,ts',
-                'VideoCodec': 'hevc,h264,h265,vp8,vp9,av1,mpeg4,mpeg2video',
-                'AudioCodec': 'aac,mp3,mp2,ac3,eac3,flac,opus,vorbis,dts',
-              },
-            ],
-            'SubtitleProfiles': const <Map<String, Object?>>[
-              {'Format': 'srt', 'Method': 'External'},
-              {'Format': 'ass', 'Method': 'External'},
-              {'Format': 'ssa', 'Method': 'External'},
-              {'Format': 'vtt', 'Method': 'External'},
-              {'Format': 'pgssub', 'Method': 'External'},
-              {'Format': 'dvdsub', 'Method': 'External'},
-              {'Format': 'dvbsub', 'Method': 'External'},
-            ],
-          },
+          'DeviceProfile': _embyPlaybackDeviceProfile(maxStreamingBitrate: maxStreamingBitrate),
         },
       );
       throwIfHttpError(response);
@@ -719,5 +932,35 @@ mixin _EmbyPlaybackMethods on MediaServerCacheMixin {
       },
     );
     throwIfHttpError(response);
+  }
+
+  /// Best-effort teardown of an active direct/transcode stream before renegotiating.
+  Future<void> closeActivePlaybackStream({
+    required String itemId,
+    String? playSessionId,
+    String? mediaSourceId,
+    String? liveStreamId,
+  }) async {
+    if (playSessionId == null || playSessionId.isEmpty) return;
+    try {
+      final query = <String, String>{
+        'PlaySessionId': playSessionId,
+        'MediaSourceId': ?mediaSourceId,
+        'LiveStreamId': ?liveStreamId,
+      };
+      final response = await _http.delete('/Videos/${_segment(itemId)}/stream', queryParameters: query);
+      logEmbyPlayback('close-active-stream', {
+        'itemId': itemId,
+        'playSessionId': '(set)',
+        'statusCode': response.statusCode,
+      });
+    } catch (e, st) {
+      logEmbyPlayback('close-active-stream-failed', {
+        'itemId': itemId,
+        'playSessionId': playSessionId.isNotEmpty ? '(set)' : null,
+        'error': e.toString(),
+      });
+      appLogger.d('EmbyClient: closeActivePlaybackStream failed (non-fatal)', error: e, stackTrace: st);
+    }
   }
 }

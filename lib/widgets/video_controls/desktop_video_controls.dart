@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
-import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 
@@ -16,7 +15,6 @@ import '../../utils/desktop_window_padding.dart';
 import '../../utils/platform_detector.dart';
 import '../../utils/formatters.dart';
 import '../../i18n/strings.g.dart';
-import '../../focus/focusable_wrapper.dart';
 import '../../models/livetv_capture_buffer.dart';
 import 'models/track_controls_state.dart';
 import 'widgets/content_strip.dart';
@@ -27,6 +25,7 @@ import 'widgets/video_controls_header.dart';
 import 'widgets/video_timeline_bar.dart';
 import 'widgets/volume_control.dart';
 import 'widgets/track_chapter_controls.dart';
+import 'emby_player_glass.dart';
 
 /// Desktop-specific video controls layout with top bar and bottom controls
 class DesktopVideoControls extends StatefulWidget {
@@ -659,22 +658,11 @@ class DesktopVideoControlsState extends State<DesktopVideoControls> {
                   ),
                 // Content strip (TV/dpad only) — replaces normal controls
                 if (_contentStripVisible && widget.useDpadNavigation)
-                  Container(
-                    padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8, top: 32),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.65),
-                          Colors.black.withValues(alpha: 0.7),
-                        ],
-                        stops: const [0.0, 0.42, 1.0],
-                      ),
-                    ),
+                  EmbyPlayerGlassBar(
+                    margin: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                    padding: const EdgeInsets.only(top: 8, bottom: 8),
                     child: Column(
-                      mainAxisSize: .min,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Symbols.keyboard_arrow_up_rounded, color: Colors.white38, size: 20),
                         const SizedBox(height: 4),
@@ -723,293 +711,321 @@ class DesktopVideoControlsState extends State<DesktopVideoControls> {
     );
   }
 
-  Widget _buildTopBarContent(BuildContext _, double leftPadding) {
-    final topBar = Padding(
-      padding: .only(left: leftPadding, right: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: VideoControlsHeader(
-              metadata: widget.metadata,
-              style: Platform.isMacOS ? VideoHeaderStyle.singleLine : VideoHeaderStyle.multiLine,
-              onBack: widget.onBack,
-            ),
-          ),
-          if (_isLive && (widget.captureBuffer == null || widget.isAtLiveEdge)) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: const BoxDecoration(color: Colors.red, borderRadius: BorderRadius.all(Radius.circular(4))),
-              child: Text(
-                t.liveTv.live,
-                style: const TextStyle(color: Colors.white, fontWeight: .bold, fontSize: 12),
-              ),
-            ),
-          ],
-        ],
-      ),
+  Widget _buildTopBarContent(BuildContext context, double leftPadding) {
+    final maxTitleWidth = MediaQuery.sizeOf(context).width - leftPadding - 140;
+    final header = VideoControlsHeader(
+      metadata: widget.metadata,
+      style: Platform.isMacOS ? VideoHeaderStyle.singleLine : VideoHeaderStyle.multiLine,
+      compactWidth: true,
+      maxTitleWidth: maxTitleWidth,
+      onBack: widget.onBack,
     );
 
-    return DesktopAppBarHelper.wrapWithGestureDetector(topBar, opaque: true);
+    final chrome = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        EmbyPlayerGlassBar(
+          minHeight: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: header,
+        ),
+        if (_isLive && (widget.captureBuffer == null || widget.isAtLiveEdge)) ...[
+          const SizedBox(width: 8),
+          EmbyPlayerGlassBar(
+            borderRadius: 12,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            minHeight: 32,
+            child: Text(
+              t.liveTv.live,
+              style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+          ),
+        ],
+      ],
+    );
+
+    return DesktopAppBarHelper.wrapWithGestureDetector(
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: EdgeInsets.only(left: leftPadding, right: 16, top: 8),
+          child: chrome,
+        ),
+      ),
+      opaque: true,
+    );
   }
 
-  Widget _buildBottomControlsContent(BuildContext _, {required bool hasFrame}) {
+  Widget _buildBottomControlsContent(BuildContext context, {required bool hasFrame}) {
     final canInteract = _canControl && hasFrame;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Row 1: Timeline (LiveTimelineBar for time-shifted live, VideoTimelineBar for VOD)
-          if (_isLive && widget.captureBuffer != null) ...[
-            LiveTimelineBar(
-              player: widget.player,
-              captureBuffer: widget.captureBuffer!,
-              streamStartEpoch: widget.streamStartEpoch,
-              isAtLiveEdge: widget.isAtLiveEdge,
-              onSeekEnd: widget.onLiveSeek,
-              horizontalLayout: true,
-              focusNode: _timelineFocusNode,
-              onKeyEvent: _handleTimelineKeyEvent,
-              onFocusChange: _onFocusChange,
-              enabled: canInteract,
-            ),
-          ] else if (!_isLive) ...[
-            VideoTimelineBar(
-              player: widget.player,
-              chapters: widget.chapters,
-              chaptersLoaded: widget.chaptersLoaded,
-              showChapterMarkersOnTimeline: widget.showChapterMarkersOnTimeline,
-              onSeek: widget.onSeek,
-              onSeekEnd: widget.onSeekEnd,
-              onScrubStart: widget.onScrubStart,
-              onScrubEnd: widget.onScrubEnd,
-              horizontalLayout: true,
-              focusNode: _timelineFocusNode,
-              onKeyEvent: _handleTimelineKeyEvent,
-              onFocusChange: _onFocusChange,
-              enabled: canInteract,
-              thumbnailDataBuilder: widget.thumbnailDataBuilder,
-              showKeyRepeatThumbnail: _showKeyRepeatThumbnail,
-              previewPosition: _timelinePreviewPosition,
-            ),
-          ],
-          // Row 2: Playback controls and options
+          EmbyPlayerGlassBar(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            child: _buildDesktopTimeline(canInteract),
+          ),
+          const SizedBox(height: 8),
           Focus(
             onFocusChange: _onButtonRowFocusChange,
             skipTraversal: true,
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                if (!_isLive) ...[
-                  // Previous item
-                  Opacity(
-                    opacity: _canControl ? 1.0 : 0.5,
-                    child: _buildFocusableButton(
-                      focusNode: _prevItemFocusNode,
-                      index: 0,
-                      icon: Symbols.skip_previous_rounded,
-                      color: widget.onPrevious != null && _canControl ? Colors.white : Colors.white54,
-                      onPressed: _canControl ? widget.onPrevious : null,
-                      semanticLabel: t.videoControls.previousButton,
-                    ),
-                  ),
-                  // Previous chapter
-                  StreamBuilder<Duration>(
-                    stream: widget.player.streams.position,
-                    initialData: widget.player.state.position,
-                    builder: (context, posSnapshot) {
-                      final prevLabel = _getPreviousChapterLabel(posSnapshot.data ?? Duration.zero);
-                      return Opacity(
-                        opacity: _canControl ? 1.0 : 0.5,
-                        child: _buildFocusableButton(
-                          focusNode: _prevChapterFocusNode,
-                          index: 1,
-                          icon: Symbols.fast_rewind_rounded,
-                          color: widget.chapters.isNotEmpty && _canControl ? Colors.white : Colors.white54,
-                          onPressed: _canControl && widget.chapters.isNotEmpty ? widget.onSeekToPreviousChapter : null,
-                          semanticLabel: t.videoControls.previousChapterButton,
-                          tooltip: prevLabel,
-                        ),
-                      );
-                    },
-                  ),
-                ],
-                if (!_isLive || widget.captureBuffer != null) ...[
-                  // Skip backward
-                  Opacity(
-                    opacity: _canControl ? 1.0 : 0.5,
-                    child: _buildFocusableButton(
-                      focusNode: _skipBackFocusNode,
-                      index: 2,
-                      icon: widget.getReplayIcon(widget.seekTimeSmall),
-                      onPressed: _canControl ? widget.onSeekBackward : null,
-                      semanticLabel: t.videoControls.seekBackwardButton(seconds: widget.seekTimeSmall),
-                    ),
-                  ),
-                ],
-                // Play/Pause
-                Opacity(
-                  opacity: _canControl ? 1.0 : 0.5,
-                  child: PlayPauseStreamBuilder(
-                    player: widget.player,
-                    builder: (context, isPlaying) {
-                      return _buildFocusableButton(
-                        focusNode: _playPauseFocusNode,
-                        index: 3,
-                        icon: isPlaying ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
-                        iconSize: 32,
-                        onPressed: _canControl
-                            ? () {
-                                if (isPlaying) {
-                                  widget.player.pause();
-                                } else {
-                                  widget.player.play();
-                                }
-                              }
-                            : null,
-                        semanticLabel: isPlaying ? t.videoControls.pauseButton : t.videoControls.playButton,
-                      );
-                    },
-                  ),
+                EmbyPlayerGlassBar(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: _buildDesktopPlaybackCluster(),
                 ),
-                if (!_isLive || widget.captureBuffer != null) ...[
-                  // Skip forward
-                  Opacity(
-                    opacity: _canControl ? 1.0 : 0.5,
-                    child: _buildFocusableButton(
-                      focusNode: _skipForwardFocusNode,
-                      index: 4,
-                      icon: widget.getForwardIcon(widget.seekTimeSmall),
-                      onPressed: _canControl ? widget.onSeekForward : null,
-                      semanticLabel: t.videoControls.seekForwardButton(seconds: widget.seekTimeSmall),
-                    ),
-                  ),
-                ],
-                // Go to Live button (only when time-shifted behind live edge)
-                if (_isLive && widget.captureBuffer != null && !widget.isAtLiveEdge && widget.onJumpToLive != null) ...[
-                  _buildFocusableButton(
-                    focusNode: _goToLiveFocusNode,
-                    index: 7,
-                    icon: Symbols.stream_rounded,
-                    onPressed: _canControl ? widget.onJumpToLive : null,
-                    semanticLabel: t.liveTv.goToLive,
-                    tooltip: t.liveTv.goToLive,
-                  ),
-                ],
-                if (!_isLive) ...[
-                  // Next chapter
-                  StreamBuilder<Duration>(
-                    stream: widget.player.streams.position,
-                    initialData: widget.player.state.position,
-                    builder: (context, posSnapshot) {
-                      final nextLabel = _getNextChapterLabel(posSnapshot.data ?? Duration.zero);
-                      return Opacity(
-                        opacity: _canControl ? 1.0 : 0.5,
-                        child: _buildFocusableButton(
-                          focusNode: _nextChapterFocusNode,
-                          index: 5,
-                          icon: Symbols.fast_forward_rounded,
-                          color: widget.chapters.isNotEmpty && _canControl ? Colors.white : Colors.white54,
-                          onPressed: _canControl && widget.chapters.isNotEmpty ? widget.onSeekToNextChapter : null,
-                          semanticLabel: t.videoControls.nextChapterButton,
-                          tooltip: nextLabel,
-                        ),
-                      );
-                    },
-                  ),
-                  // Next item
-                  Opacity(
-                    opacity: _canControl ? 1.0 : 0.5,
-                    child: _buildFocusableButton(
-                      focusNode: _nextItemFocusNode,
-                      index: 6,
-                      icon: Symbols.skip_next_rounded,
-                      color: widget.onNext != null && _canControl ? Colors.white : Colors.white54,
-                      onPressed: _canControl ? widget.onNext : null,
-                      semanticLabel: t.videoControls.nextButton,
-                    ),
-                  ),
-                ],
-                // Finish time (hidden for live TV, faded when too narrow)
-                if (_isLive)
-                  const Spacer()
-                else
-                  Expanded(
-                    child: StreamBuilder<Duration>(
-                      stream: widget.player.streams.position,
-                      initialData: widget.player.state.position,
-                      builder: (context, posSnap) {
-                        return StreamBuilder<Duration>(
-                          stream: widget.player.streams.duration,
-                          initialData: widget.player.state.duration,
-                          builder: (context, durSnap) {
-                            return StreamBuilder<double>(
-                              stream: widget.player.streams.rate,
-                              initialData: widget.player.state.rate,
-                              builder: (context, rateSnap) {
-                                final position = posSnap.data ?? Duration.zero;
-                                final duration = durSnap.data ?? Duration.zero;
-                                final remaining = duration - position;
-                                final rate = rateSnap.data ?? 1.0;
-                                if (remaining.inSeconds <= 0) return const SizedBox.shrink();
-
-                                final text = t.videoControls.endsAt(
-                                  time: formatFinishTime(
-                                    remaining,
-                                    rate: rate,
-                                    is24Hour: MediaQuery.alwaysUse24HourFormatOf(context),
-                                  ),
-                                );
-                                const style = TextStyle(color: Colors.white70, fontSize: 13);
-
-                                return Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: Text(text, style: style, maxLines: 1, softWrap: false, overflow: .fade),
-                                );
-                              },
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                // Volume control (hidden on TV — hardware handles volume)
+                const Spacer(),
                 if (!PlatformDetector.isTV()) ...[
-                  VolumeControl(
-                    player: widget.player,
-                    focusNode: _volumeFocusNode,
-                    onKeyEvent: _handleVolumeKeyEvent,
-                    onFocusChange: _onFocusChange,
-                    onFocusActivity: widget.onFocusActivity,
+                  EmbyPlayerGlassBar(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: VolumeControl(
+                      player: widget.player,
+                      focusNode: _volumeFocusNode,
+                      onKeyEvent: _handleVolumeKeyEvent,
+                      onFocusChange: _onFocusChange,
+                      onFocusActivity: widget.onFocusActivity,
+                    ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 8),
                 ],
-                // Audio track, subtitle, and chapter controls
-                TrackChapterControls(
-                  player: widget.player,
-                  chapters: widget.chapters,
-                  chaptersLoaded: widget.chaptersLoaded,
-                  trackControlsState: _trackControlsState,
-                  onSeekRequested: widget.onSeekRequested,
-                  onSeekCompleted: widget.onSeekCompleted,
-                  focusNodes: _trackControlFocusNodes,
-                  onFocusChange: _onFocusChange,
-                  onNavigateLeft: navigateFromTrackToVolume,
-                  onNavigateUp: () {
-                    _timelineFocusNode.requestFocus();
-                    widget.onFocusActivity?.call();
-                  },
-                  onNavigateDown: () {
-                    if (widget.useDpadNavigation && _hasStripContent) {
-                      _showContentStrip();
-                    }
-                  },
-                  hideChaptersAndQueue: widget.useDpadNavigation && _hasStripContent,
+                EmbyPlayerGlassBar(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: TrackChapterControls(
+                    player: widget.player,
+                    chapters: widget.chapters,
+                    chaptersLoaded: widget.chaptersLoaded,
+                    trackControlsState: _trackControlsState,
+                    onSeekRequested: widget.onSeekRequested,
+                    onSeekCompleted: widget.onSeekCompleted,
+                    focusNodes: _trackControlFocusNodes,
+                    onFocusChange: _onFocusChange,
+                    onNavigateLeft: navigateFromTrackToVolume,
+                    onNavigateUp: () {
+                      _timelineFocusNode.requestFocus();
+                      widget.onFocusActivity?.call();
+                    },
+                    onNavigateDown: () {
+                      if (widget.useDpadNavigation && _hasStripContent) {
+                        _showContentStrip();
+                      }
+                    },
+                    hideChaptersAndQueue: widget.useDpadNavigation && _hasStripContent,
+                  ),
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDesktopTimeline(bool canInteract) {
+    if (_isLive && widget.captureBuffer != null) {
+      return LiveTimelineBar(
+        player: widget.player,
+        captureBuffer: widget.captureBuffer!,
+        streamStartEpoch: widget.streamStartEpoch,
+        isAtLiveEdge: widget.isAtLiveEdge,
+        onSeekEnd: widget.onLiveSeek,
+        horizontalLayout: true,
+        focusNode: _timelineFocusNode,
+        onKeyEvent: _handleTimelineKeyEvent,
+        onFocusChange: _onFocusChange,
+        enabled: canInteract,
+      );
+    }
+    if (!_isLive) {
+      return VideoTimelineBar(
+        player: widget.player,
+        chapters: widget.chapters,
+        chaptersLoaded: widget.chaptersLoaded,
+        showChapterMarkersOnTimeline: widget.showChapterMarkersOnTimeline,
+        onSeek: widget.onSeek,
+        onSeekEnd: widget.onSeekEnd,
+        onScrubStart: widget.onScrubStart,
+        onScrubEnd: widget.onScrubEnd,
+        horizontalLayout: true,
+        focusNode: _timelineFocusNode,
+        onKeyEvent: _handleTimelineKeyEvent,
+        onFocusChange: _onFocusChange,
+        enabled: canInteract,
+        thumbnailDataBuilder: widget.thumbnailDataBuilder,
+        showKeyRepeatThumbnail: _showKeyRepeatThumbnail,
+        previewPosition: _timelinePreviewPosition,
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildDesktopPlaybackCluster() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!_isLive) ...[
+          Opacity(
+            opacity: _canControl ? 1.0 : 0.5,
+            child: _buildFocusableButton(
+              focusNode: _prevItemFocusNode,
+              index: 0,
+              icon: Symbols.skip_previous_rounded,
+              color: widget.onPrevious != null && _canControl ? Colors.white : Colors.white54,
+              onPressed: _canControl ? widget.onPrevious : null,
+              semanticLabel: t.videoControls.previousButton,
+            ),
+          ),
+          StreamBuilder<Duration>(
+            stream: widget.player.streams.position,
+            initialData: widget.player.state.position,
+            builder: (context, posSnapshot) {
+              final prevLabel = _getPreviousChapterLabel(posSnapshot.data ?? Duration.zero);
+              return Opacity(
+                opacity: _canControl ? 1.0 : 0.5,
+                child: _buildFocusableButton(
+                  focusNode: _prevChapterFocusNode,
+                  index: 1,
+                  icon: Symbols.fast_rewind_rounded,
+                  color: widget.chapters.isNotEmpty && _canControl ? Colors.white : Colors.white54,
+                  onPressed: _canControl && widget.chapters.isNotEmpty ? widget.onSeekToPreviousChapter : null,
+                  semanticLabel: t.videoControls.previousChapterButton,
+                  tooltip: prevLabel,
+                ),
+              );
+            },
+          ),
+        ],
+        if (!_isLive || widget.captureBuffer != null) ...[
+          Opacity(
+            opacity: _canControl ? 1.0 : 0.5,
+            child: _buildFocusableButton(
+              focusNode: _skipBackFocusNode,
+              index: 2,
+              icon: widget.getReplayIcon(widget.seekTimeSmall),
+              onPressed: _canControl ? widget.onSeekBackward : null,
+              semanticLabel: t.videoControls.seekBackwardButton(seconds: widget.seekTimeSmall),
+            ),
+          ),
+        ],
+        Opacity(
+          opacity: _canControl ? 1.0 : 0.5,
+          child: PlayPauseStreamBuilder(
+            player: widget.player,
+            builder: (context, isPlaying) {
+              return _buildFocusableButton(
+                focusNode: _playPauseFocusNode,
+                index: 3,
+                icon: isPlaying ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
+                iconSize: 32,
+                onPressed: _canControl
+                    ? () {
+                        if (isPlaying) {
+                          widget.player.pause();
+                        } else {
+                          widget.player.play();
+                        }
+                      }
+                    : null,
+                semanticLabel: isPlaying ? t.videoControls.pauseButton : t.videoControls.playButton,
+              );
+            },
+          ),
+        ),
+        if (!_isLive || widget.captureBuffer != null) ...[
+          Opacity(
+            opacity: _canControl ? 1.0 : 0.5,
+            child: _buildFocusableButton(
+              focusNode: _skipForwardFocusNode,
+              index: 4,
+              icon: widget.getForwardIcon(widget.seekTimeSmall),
+              onPressed: _canControl ? widget.onSeekForward : null,
+              semanticLabel: t.videoControls.seekForwardButton(seconds: widget.seekTimeSmall),
+            ),
+          ),
+        ],
+        if (_isLive && widget.captureBuffer != null && !widget.isAtLiveEdge && widget.onJumpToLive != null)
+          _buildFocusableButton(
+            focusNode: _goToLiveFocusNode,
+            index: 7,
+            icon: Symbols.stream_rounded,
+            onPressed: _canControl ? widget.onJumpToLive : null,
+            semanticLabel: t.liveTv.goToLive,
+            tooltip: t.liveTv.goToLive,
+          ),
+        if (!_isLive) ...[
+          StreamBuilder<Duration>(
+            stream: widget.player.streams.position,
+            initialData: widget.player.state.position,
+            builder: (context, posSnapshot) {
+              final nextLabel = _getNextChapterLabel(posSnapshot.data ?? Duration.zero);
+              return Opacity(
+                opacity: _canControl ? 1.0 : 0.5,
+                child: _buildFocusableButton(
+                  focusNode: _nextChapterFocusNode,
+                  index: 5,
+                  icon: Symbols.fast_forward_rounded,
+                  color: widget.chapters.isNotEmpty && _canControl ? Colors.white : Colors.white54,
+                  onPressed: _canControl && widget.chapters.isNotEmpty ? widget.onSeekToNextChapter : null,
+                  semanticLabel: t.videoControls.nextChapterButton,
+                  tooltip: nextLabel,
+                ),
+              );
+            },
+          ),
+          Opacity(
+            opacity: _canControl ? 1.0 : 0.5,
+            child: _buildFocusableButton(
+              focusNode: _nextItemFocusNode,
+              index: 6,
+              icon: Symbols.skip_next_rounded,
+              color: widget.onNext != null && _canControl ? Colors.white : Colors.white54,
+              onPressed: _canControl ? widget.onNext : null,
+              semanticLabel: t.videoControls.nextButton,
+            ),
+          ),
+        ],
+        if (!_isLive)
+          StreamBuilder<Duration>(
+            stream: widget.player.streams.position,
+            initialData: widget.player.state.position,
+            builder: (context, posSnap) {
+              return StreamBuilder<Duration>(
+                stream: widget.player.streams.duration,
+                initialData: widget.player.state.duration,
+                builder: (context, durSnap) {
+                  return StreamBuilder<double>(
+                    stream: widget.player.streams.rate,
+                    initialData: widget.player.state.rate,
+                    builder: (context, rateSnap) {
+                      final position = posSnap.data ?? Duration.zero;
+                      final duration = durSnap.data ?? Duration.zero;
+                      final remaining = duration - position;
+                      final rate = rateSnap.data ?? 1.0;
+                      if (remaining.inSeconds <= 0) return const SizedBox.shrink();
+
+                      final text = t.videoControls.endsAt(
+                        time: formatFinishTime(
+                          remaining,
+                          rate: rate,
+                          is24Hour: MediaQuery.alwaysUse24HourFormatOf(context),
+                        ),
+                      );
+                      const style = TextStyle(color: Colors.white70, fontSize: 13);
+
+                      return Padding(
+                        padding: const EdgeInsets.only(left: 8, right: 4),
+                        child: Text(text, style: style, maxLines: 1, softWrap: false, overflow: TextOverflow.fade),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+      ],
     );
   }
 
@@ -1049,26 +1065,17 @@ class DesktopVideoControlsState extends State<DesktopVideoControls> {
     double iconSize = 24,
     String? tooltip,
   }) {
-    return FocusableWrapper(
+    return EmbyPlayerGlassIconButton(
+      semanticLabel: semanticLabel,
+      icon: icon,
+      iconSize: iconSize,
+      size: 44,
+      color: color,
+      onPressed: onPressed,
       focusNode: focusNode,
-      onSelect: onPressed,
       onKeyEvent: (node, event) => _handleButtonKeyEvent(node, event, index),
       onFocusChange: _onFocusChange,
-      borderRadius: 20,
-      autoScroll: false,
-      useBackgroundFocus: true,
-      semanticLabel: semanticLabel,
-      child: Semantics(
-        label: semanticLabel,
-        button: true,
-        excludeSemantics: true,
-        child: IconButton(
-          icon: AppIcon(icon, fill: 1, color: color, size: iconSize),
-          iconSize: iconSize,
-          tooltip: tooltip,
-          onPressed: onPressed,
-        ),
-      ),
+      tooltip: tooltip,
     );
   }
 }

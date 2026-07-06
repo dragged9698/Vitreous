@@ -7,17 +7,17 @@
 	const siteSchema = {
 		"@context": "https://schema.org",
 		"@type": "WebSite",
-		"name": "Plezy",
-		"url": "https://plezy.app"
+		"name": "Vitreous",
+		"url": "https://vitreous.app"
 	};
 
 	const orgSchema = {
 		"@context": "https://schema.org",
 		"@type": "Organization",
-		"name": "Plezy",
-		"url": "https://plezy.app",
-		"logo": "https://plezy.app/og/plezy-social.png",
-		"sameAs": ["https://github.com/edde746/plezy"]
+		"name": "Vitreous",
+		"url": "https://vitreous.app",
+		"logo": "https://vitreous.app/og/vitreous-social.png",
+		"sameAs": ["https://github.com/dragged9698/Vitreous"]
 	};
 </script>
 

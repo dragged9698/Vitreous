@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:emby_player/widgets/app_icon.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'package:rate_limiter/rate_limiter.dart';
@@ -11,9 +12,11 @@ import '../mixins/controller_disposer_mixin.dart';
 import '../mixins/mounted_set_state_mixin.dart';
 import '../mixins/refreshable.dart';
 import '../providers/multi_server_provider.dart';
+import '../theme/emby_glass_theme.dart';
 import '../utils/app_logger.dart';
 import '../utils/platform_detector.dart';
 import '../utils/snackbar_helper.dart';
+import '../widgets/emby_glass_browse_shell.dart';
 import '../widgets/desktop_app_bar.dart';
 import '../widgets/loading_indicator_box.dart';
 import '../widgets/pill_input_decoration.dart';
@@ -243,74 +246,96 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
+  List<Widget> _buildSearchSlivers({required bool useGlassShell}) => [
+        if (!useGlassShell)
+          DesktopSliverAppBar(title: Text(t.common.search), floating: true),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, useGlassShell ? 8 : 16, 16, 16),
+            child: useGlassShell
+                ? GlassSearchBar(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    placeholder: t.search.hint,
+                    quality: embyChromeGlassQuality(),
+                    onSubmitted: (_) => _handleSearchSubmit(),
+                    showsCancelButton: _searchController.text.isNotEmpty,
+                    onCancel: () {
+                      _searchController.clear();
+                      _searchFocusNode.requestFocus();
+                    },
+                  )
+                : FocusableTextField(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    textInputAction: TextInputAction.search,
+                    onNavigateLeft: _navigateToSidebar,
+                    onNavigateDown: _searchResults.isNotEmpty && !_isSearching
+                        ? _firstResultFocusNode.requestFocus
+                        : null,
+                    onEditingComplete: PlatformDetector.isTV() ? _handleSearchSubmit : null,
+                    onBack: () {
+                      if (_searchController.text.isNotEmpty) {
+                        _searchController.clear();
+                      } else {
+                        _navigateToSidebar();
+                      }
+                    },
+                    decoration: pillInputDecoration(
+                      context,
+                      hintText: t.search.hint,
+                      prefixIcon: const AppIcon(Symbols.search_rounded, fill: 1),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const AppIcon(Symbols.clear_rounded, fill: 1),
+                              onPressed: _searchController.clear,
+                            )
+                          : null,
+                    ),
+                  ),
+          ),
+        ),
+        if (_isSearching)
+          LoadingIndicatorBox.sliver
+        else if (!_hasSearched)
+          SliverFillRemaining(
+            child: StateMessageWidget(
+              message: t.search.searchYourMedia,
+              subtitle: t.search.enterTitleActorOrKeyword,
+              icon: Symbols.search_rounded,
+              iconSize: 80,
+            ),
+          )
+        else if (_searchResults.isEmpty)
+          SliverFillRemaining(
+            child: StateMessageWidget(
+              message: t.messages.noResultsFound,
+              subtitle: t.search.tryDifferentTerm,
+              icon: Symbols.search_off_rounded,
+              iconSize: 80,
+            ),
+          )
+        else
+          _buildResultsList(context),
+      ];
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: CustomScrollView(
-          primary: false,
-          slivers: [
-            DesktopSliverAppBar(title: Text(t.common.search), floating: true),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-                child: FocusableTextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  textInputAction: TextInputAction.search,
-                  onNavigateLeft: _navigateToSidebar,
-                  onNavigateDown: _searchResults.isNotEmpty && !_isSearching
-                      ? _firstResultFocusNode.requestFocus
-                      : null,
-                  onEditingComplete: PlatformDetector.isTV() ? _handleSearchSubmit : null,
-                  onBack: () {
-                    if (_searchController.text.isNotEmpty) {
-                      _searchController.clear();
-                    } else {
-                      _navigateToSidebar();
-                    }
-                  },
-                  decoration: pillInputDecoration(
-                    context,
-                    hintText: t.search.hint,
-                    prefixIcon: const AppIcon(Symbols.search_rounded, fill: 1),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const AppIcon(Symbols.clear_rounded, fill: 1),
-                            onPressed: () {
-                              _searchController.clear();
-                            },
-                          )
-                        : null,
-                  ),
-                ),
-              ),
-            ),
-            if (_isSearching)
-              LoadingIndicatorBox.sliver
-            else if (!_hasSearched)
-              SliverFillRemaining(
-                child: StateMessageWidget(
-                  message: t.search.searchYourMedia,
-                  subtitle: t.search.enterTitleActorOrKeyword,
-                  icon: Symbols.search_rounded,
-                  iconSize: 80,
-                ),
-              )
-            else if (_searchResults.isEmpty)
-              SliverFillRemaining(
-                child: StateMessageWidget(
-                  message: t.messages.noResultsFound,
-                  subtitle: t.search.tryDifferentTerm,
-                  icon: Symbols.search_off_rounded,
-                  iconSize: 80,
-                ),
-              )
-            else
-              _buildResultsList(context),
-          ],
-        ),
-      ),
+    final useGlassShell = PlatformDetector.shouldUseSideNavigation(context);
+    final scrollView = CustomScrollView(
+      primary: false,
+      slivers: _buildSearchSlivers(useGlassShell: useGlassShell),
+    );
+
+    if (!useGlassShell) {
+      return Scaffold(
+        body: SafeArea(child: scrollView),
+      );
+    }
+
+    return EmbyGlassBrowseScaffold(
+      appBar: GlassAppBar(title: Text(t.common.search)),
+      body: scrollView,
     );
   }
 }

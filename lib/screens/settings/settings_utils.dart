@@ -1,11 +1,14 @@
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../../focus/focusable_text_field.dart';
 import '../../focus/input_mode_tracker.dart';
 import '../../i18n/strings.g.dart';
+import '../../theme/emby_glass_theme.dart';
 import '../../utils/dialogs.dart';
 import '../../widgets/dialog_action_button.dart';
+import '../../widgets/emby_glass_settings.dart';
 import '../../widgets/focusable_list_tile.dart';
 import '../../widgets/tv_color_picker.dart';
 import '../../widgets/tv_number_spinner.dart';
@@ -108,29 +111,39 @@ Future<T?> showSelectionDialog<T>({
   final focusFirstItem = InputModeTracker.isKeyboardMode(context);
   return showScopedDialog<T>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text(title),
-      contentPadding: const EdgeInsets.only(top: 12, bottom: 24),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: .min,
-          children: options.map((option) {
-            final selected = option.value == currentValue;
-            return FocusableListTile(
-              key: ValueKey(option.value),
-              leading: Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                color: selected ? Theme.of(dialogContext).colorScheme.primary : null,
-              ),
-              title: Text(option.title),
-              subtitle: option.subtitle != null ? Text(option.subtitle!) : null,
-              selected: selected,
-              autofocus: focusFirstItem && selected,
-              onTap: () => Navigator.pop(dialogContext, option.value),
-            );
-          }).toList(),
+    builder: (dialogContext) => GlassDialog(
+      title: title,
+      maxWidth: 420,
+      quality: embyChromeGlassQuality(),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 480),
+        child: SingleChildScrollView(
+          child: EmbyGlassGroupedSection(
+            margin: EdgeInsets.zero,
+            children: options.map((option) {
+              final selected = option.value == currentValue;
+              return FocusableListTile(
+                key: ValueKey(option.value),
+                leading: Icon(
+                  selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  color: selected ? Theme.of(dialogContext).colorScheme.primary : null,
+                ),
+                title: Text(option.title),
+                subtitle: option.subtitle != null ? Text(option.subtitle!) : null,
+                selected: selected,
+                autofocus: focusFirstItem && selected,
+                onTap: () => Navigator.pop(dialogContext, option.value),
+              );
+            }).toList(),
+          ),
         ),
       ),
+      actions: [
+        GlassDialogAction(
+          label: t.common.cancel,
+          onPressed: () => Navigator.pop(dialogContext),
+        ),
+      ],
     ),
   );
 }

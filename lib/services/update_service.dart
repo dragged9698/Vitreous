@@ -14,8 +14,8 @@ import 'base_shared_preferences_service.dart';
 /// On all other platforms: falls back to GitHub API check + browser link dialog.
 class UpdateService {
   static final Logger _logger = Logger();
-  static const String _githubRepo = 'edde746/plezy';
-  static const String _feedUrl = 'https://cdn.jsdelivr.net/gh/edde746/plezy@appcast/appcast.xml';
+  static const String _githubRepo = 'dragged9698/Vitreous';
+  static const String _feedUrl = 'https://cdn.jsdelivr.net/gh/dragged9698/Vitreous@appcast/appcast.xml';
 
   static const String _keySkippedVersion = 'update_skipped_version';
   static const String _keyLastCheckTime = 'update_last_check_time';

@@ -78,6 +78,16 @@ class VideoFilterManager {
   /// Current BoxFit mode (0=contain, 1=cover, 2=fill)
   int get boxFitMode => _boxFitMode;
 
+  /// BoxFit mode in effect before PiP forced contain (null if already contain).
+  int? get prePipBoxFitMode => _prePipBoxFitMode;
+
+  /// PiP window resize locks to video aspect only in letterbox/contain mode.
+  /// Cover (fill screen) and stretch allow arbitrary window shapes.
+  bool get pipResizeLocksAspectRatio {
+    final mode = _prePipBoxFitMode ?? _boxFitMode;
+    return mode == 0;
+  }
+
   double get zoomScale => _zoomScale;
 
   Size? get playerSize => _playerSize;

@@ -29,7 +29,7 @@ void main() {
         baseUrl: 'http://$serverId:32400',
         token: 'old-token',
         clientIdentifier: 'client-id',
-        product: 'Plezy',
+        product: 'Vitreous',
         version: 'test',
       ),
       serverId: ServerId(serverId),

@@ -21,7 +21,11 @@ String buildEmbyDirectStreamUrl({
     'AudioStreamIndex': ?audioStreamIndex?.toString(),
   };
   final encodedItem = Uri.encodeComponent(itemId);
-  return '$baseUrl/Videos/$encodedItem/stream?${_encodeQuery(params)}';
+  final containerExt = container?.trim().toLowerCase();
+  final streamPath = !staticStream && containerExt != null && containerExt.isNotEmpty
+      ? '/Videos/$encodedItem/stream.$containerExt'
+      : '/Videos/$encodedItem/stream';
+  return '$baseUrl$streamPath?${_encodeQuery(params)}';
 }
 
 String buildEmbyTrickplayTileUrl({
@@ -40,6 +44,21 @@ String buildEmbyTrickplayTileUrl({
 
 String _encodeQuery(Map<String, String> params) =>
     params.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
+
+/// Ensures Emby HLS transcode URLs carry the negotiated [startTimeTicks].
+///
+/// PlaybackInfo may return a stale `StartTimeTicks` when a direct-stream
+/// session is still active (quality switch mid-playback). The player does not
+/// seek Emby transcodes — it relies on the server offset plus a timeline
+/// offset — so the URL must match the requested resume position.
+String embyWithTranscodeStartTimeTicks(String url, int? startTimeTicks) {
+  if (startTimeTicks == null || startTimeTicks <= 0) return url;
+  final uri = Uri.tryParse(url);
+  if (uri == null) return url;
+  final params = Map<String, String>.from(uri.queryParameters);
+  params['StartTimeTicks'] = startTimeTicks.toString();
+  return uri.replace(queryParameters: params).toString();
+}
 
 /// Aligns negotiated `DirectStreamUrl` with [staticStream] — drop `Static=true`
 /// for progressive server-side reads on virtual/symlink mounts.

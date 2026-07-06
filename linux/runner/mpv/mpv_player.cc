@@ -14,6 +14,7 @@
 #include <clocale>
 
 #include "sanitize_utf8.h"
+#include "window_keep_above.h"
 
 // Flutter on Linux uses EGL (OpenGL ES) for both X11 and Wayland.
 static void* get_opengl_proc_address(void* ctx, const char* name) {
@@ -708,7 +709,7 @@ int64_t MpvPlayer::EmbedWindowId(GtkWidget* widget) {
   if (!gdk_window) return 0;
 
 #ifdef GDK_WINDOWING_WAYLAND
-  GdkDisplay* display = gdk_window_get_display();
+  GdkDisplay* display = gdk_window_get_display(gdk_window);
   if (GDK_IS_WAYLAND_DISPLAY(display)) {
     struct wl_surface* surface = gdk_wayland_window_get_wl_surface(gdk_window);
     return reinterpret_cast<int64_t>(surface);
@@ -738,20 +739,27 @@ bool MpvPlayer::InitializeEmbed(GtkWidget* flutter_view) {
   std::setlocale(LC_NUMERIC, "C");
 
   GtkWidget* toplevel = gtk_widget_get_toplevel(flutter_view);
-  embed_window_ = GTK_WINDOW(gtk_window_new(GTK_WINDOW_POPUP));
+  // Wayland xdg-popup surfaces cannot stay above other apps; use a utility
+  // toplevel for HDR embed so keep-above maps to xdg_toplevel "above" state.
+  if (emby_window_is_wayland()) {
+    embed_window_ = GTK_WINDOW(gtk_window_new(GTK_WINDOW_TOPLEVEL));
+    gtk_window_set_type_hint(embed_window_, GDK_WINDOW_TYPE_HINT_UTILITY);
+  } else {
+    embed_window_ = GTK_WINDOW(gtk_window_new(GTK_WINDOW_POPUP));
+    if (GTK_IS_WINDOW(toplevel)) {
+      gtk_window_set_transient_for(embed_window_, GTK_WINDOW(toplevel));
+    }
+  }
   gtk_window_set_decorated(embed_window_, FALSE);
   gtk_window_set_skip_taskbar_hint(embed_window_, TRUE);
   gtk_window_set_skip_pager_hint(embed_window_, TRUE);
-  if (GTK_IS_WINDOW(toplevel)) {
-    gtk_window_set_transient_for(embed_window_, GTK_WINDOW(toplevel));
-  }
 
   embed_video_ = gtk_drawing_area_new();
   gtk_widget_set_app_paintable(embed_video_, TRUE);
   gtk_container_add(GTK_CONTAINER(embed_window_), embed_video_);
   gtk_widget_show_all(GTK_WIDGET(embed_window_));
   if (embed_keep_above_) {
-    gtk_window_set_keep_above(embed_window_, TRUE);
+    emby_window_set_keep_above(embed_window_, TRUE);
   }
 
   mpv_ = mpv_create();
@@ -858,9 +866,8 @@ void MpvPlayer::SetVisible(bool visible) {
 
 void MpvPlayer::SetEmbedKeepAbove(bool keep_above) {
   embed_keep_above_ = keep_above;
-  if (embed_window_) {
-    gtk_window_set_keep_above(embed_window_, keep_above ? TRUE : FALSE);
-  }
+  if (!embed_window_) return;
+  emby_window_set_keep_above(embed_window_, keep_above ? TRUE : FALSE);
 }
 
 }  // namespace mpv

@@ -159,8 +159,11 @@ mixin _JellyfinPlaybackMethods on MediaServerCacheMixin {
     TranscodeFallbackReason? fallbackReason;
 
     final preset = options.qualityPreset;
+    final mustDirectStream = embySourceMustDirectStream(bundle.selectedSource);
     final requestedAudioStreamId = _validJellyfinAudioStreamId(options.selectedAudioStreamId, mediaInfo);
-    final int? maxStreamingBitrate = preset.isOriginal ? null : (preset.videoBitrateKbps ?? 100_000) * 1000;
+    final int? maxStreamingBitrate = (preset.isOriginal || mustDirectStream)
+        ? embyOriginalPlaybackBitrate
+        : (preset.videoBitrateKbps ?? 100_000) * 1000;
     final resumeOffsetMs = metadata.viewOffsetMs;
     final int? transcodeStartTimeTicks = !preset.isOriginal && resumeOffsetMs != null && resumeOffsetMs > 0
         ? msToJellyfinTicks(resumeOffsetMs)
@@ -171,6 +174,7 @@ mixin _JellyfinPlaybackMethods on MediaServerCacheMixin {
       mediaSourceId: bundle.selectedSourceId,
       startTimeTicks: transcodeStartTimeTicks,
       audioStreamIndex: requestedAudioStreamId,
+      autoOpenLiveStream: true,
     );
     if (negotiation == null) {
       if (!preset.isOriginal) {
@@ -201,15 +205,19 @@ mixin _JellyfinPlaybackMethods on MediaServerCacheMixin {
         final directStreamUrl = chosenSource['DirectStreamUrl'];
         final supportsDirectStream = embySourceSupportsDirectStream(chosenSource);
         final staticStream = embySourcePrefersStaticStream(chosenSource);
-        if (!preset.isOriginal && transcodingUrl is String && transcodingUrl.isNotEmpty) {
-          capturePlaySessionId(transcodingUrl);
-          videoUrl = _withApiKey(transcodingUrl);
+        final progressiveDirectUrl = embyIsProgressiveDirectStreamUrl(directStreamUrl as String?)
+            ? directStreamUrl as String
+            : null;
+        final hlsTranscodeUrl = embyPickHlsTranscodeUrl(transcodingUrl, directStreamUrl);
+        if (!preset.isOriginal && hlsTranscodeUrl != null) {
+          capturePlaySessionId(hlsTranscodeUrl);
+          videoUrl = _withApiKey(hlsTranscodeUrl);
           playMethod = 'Transcode';
           isTranscoding = true;
           includeExternalSubtitleDelivery = true;
-        } else if (supportsDirectStream && directStreamUrl is String && directStreamUrl.isNotEmpty) {
-          capturePlaySessionId(directStreamUrl);
-          videoUrl = _withApiKey(sanitizeMediaBrowserDirectStreamUrl(directStreamUrl, staticStream: staticStream));
+        } else if (progressiveDirectUrl != null && supportsDirectStream) {
+          capturePlaySessionId(progressiveDirectUrl);
+          videoUrl = _withApiKey(sanitizeMediaBrowserDirectStreamUrl(progressiveDirectUrl, staticStream: staticStream));
           playMethod = 'DirectStream';
         } else if (transcodingUrl is String && transcodingUrl.isNotEmpty) {
           capturePlaySessionId(transcodingUrl);
@@ -537,7 +545,7 @@ mixin _JellyfinPlaybackMethods on MediaServerCacheMixin {
           'AllowVideoStreamCopy': ?allowVideoStreamCopy,
           'AllowAudioStreamCopy': ?allowAudioStreamCopy,
           'DeviceProfile': <String, Object?>{
-            'Name': 'Plezy',
+            'Name': 'Vitreous',
             'MaxStreamingBitrate': ?maxStreamingBitrate,
             'CodecProfiles': const <Map<String, Object?>>[],
             // Comma-separated codec lists are order-sensitive — first entry

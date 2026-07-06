@@ -35,31 +35,31 @@
   ];
 
   const phoneShots = [
-    { image: phoneHomeImage, alt: 'Plezy home screen' },
-    { image: phoneLibraryImage, alt: 'Plezy library view' },
-    { image: phoneMdImage, alt: 'Plezy media details' },
-    { image: phoneSearchImage, alt: 'Plezy search' },
+    { image: phoneHomeImage, alt: 'Vitreous home screen' },
+    { image: phoneLibraryImage, alt: 'Vitreous library view' },
+    { image: phoneMdImage, alt: 'Vitreous media details' },
+    { image: phoneSearchImage, alt: 'Vitreous search' },
   ];
 
   const tabletShots = [
-    { image: tabletHomeImage, alt: 'Plezy on tablet - home' },
-    { image: tabletLibraryImage, alt: 'Plezy on tablet - library' },
-    { image: tabletMdImage, alt: 'Plezy on tablet - media details' },
-    { image: tabletPlayerImage, alt: 'Plezy on tablet - video player' },
+    { image: tabletHomeImage, alt: 'Vitreous on tablet - home' },
+    { image: tabletLibraryImage, alt: 'Vitreous on tablet - library' },
+    { image: tabletMdImage, alt: 'Vitreous on tablet - media details' },
+    { image: tabletPlayerImage, alt: 'Vitreous on tablet - video player' },
   ];
 
   const desktopShots = [
-    { image: desktopHomeImage, alt: 'Plezy on desktop - home' },
-    { image: desktopLibraryImage, alt: 'Plezy on desktop - library' },
-    { image: desktopMdImage, alt: 'Plezy on desktop - media details' },
-    { image: desktopPlayerImage, alt: 'Plezy on desktop - video player' },
+    { image: desktopHomeImage, alt: 'Vitreous on desktop - home' },
+    { image: desktopLibraryImage, alt: 'Vitreous on desktop - library' },
+    { image: desktopMdImage, alt: 'Vitreous on desktop - media details' },
+    { image: desktopPlayerImage, alt: 'Vitreous on desktop - video player' },
   ];
 
   const tvShots = [
-    { image: tvHomeImage, alt: 'Plezy on TV - home' },
-    { image: tvLibraryImage, alt: 'Plezy on TV - library' },
-    { image: tvMdImage, alt: 'Plezy on TV - media details' },
-    { image: tvPlayerImage, alt: 'Plezy on TV - video player' },
+    { image: tvHomeImage, alt: 'Vitreous on TV - home' },
+    { image: tvLibraryImage, alt: 'Vitreous on TV - library' },
+    { image: tvMdImage, alt: 'Vitreous on TV - media details' },
+    { image: tvPlayerImage, alt: 'Vitreous on TV - video player' },
   ];
 
   const screenshots: Record<

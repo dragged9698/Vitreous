@@ -21,7 +21,11 @@ String buildJellyfinDirectStreamUrl({
     'AudioStreamIndex': ?audioStreamIndex?.toString(),
   };
   final encodedItem = Uri.encodeComponent(itemId);
-  return '$baseUrl/Videos/$encodedItem/stream?${_encodeQuery(params)}';
+  final containerExt = container?.trim().toLowerCase();
+  final streamPath = !staticStream && containerExt != null && containerExt.isNotEmpty
+      ? '/Videos/$encodedItem/stream.$containerExt'
+      : '/Videos/$encodedItem/stream';
+  return '$baseUrl$streamPath?${_encodeQuery(params)}';
 }
 
 String buildJellyfinTrickplayTileUrl({

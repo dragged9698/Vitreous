@@ -20,8 +20,8 @@ class PlayerNative extends PlayerBase {
   @override
   int? get textureId => _textureIdValue;
 
-  static const _methodChannel = MethodChannel('com.plezy/mpv_player');
-  static const _eventChannel = EventChannel('com.plezy/mpv_player/events');
+  static const _methodChannel = MethodChannel('com.vitreous/mpv_player');
+  static const _eventChannel = EventChannel('com.vitreous/mpv_player/events');
 
   @override
   MethodChannel get methodChannel => _methodChannel;

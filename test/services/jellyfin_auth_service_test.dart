@@ -30,7 +30,7 @@ JellyfinConnection _existingConn({String accessToken = 'tok-old'}) => JellyfinCo
 
 JellyfinConnectionAuthService _service({required _Handler handler}) {
   return JellyfinConnectionAuthService(
-    clientName: 'Plezy',
+    clientName: 'Vitreous',
     clientVersion: 'test',
     deviceName: 'TestDevice',
     testHttpClientFactory: () => MockClient((req) async => handler(req)),
@@ -215,7 +215,7 @@ void main() {
 
     test('returns false on transport error', () async {
       final svc = JellyfinConnectionAuthService(
-        clientName: 'Plezy',
+        clientName: 'Vitreous',
         clientVersion: 'test',
         deviceName: 'TestDevice',
         testHttpClientFactory: () => MockClient((_) async => throw http.ClientException('network down')),

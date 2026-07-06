@@ -11,12 +11,12 @@
       <!-- Logo + name -->
       <div class="footer-brand">
         <span class="footer-logo"><Logo /></span>
-        <span>Plezy</span>
+        <span>Vitreous</span>
       </div>
 
       <!-- Links -->
       <nav class="footer-nav">
-        <a href="https://github.com/edde746/plezy" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/dragged9698/Vitreous" target="_blank" rel="noopener noreferrer">GitHub</a>
         <a href="/privacy">Privacy Policy</a>
       </nav>
     </div>

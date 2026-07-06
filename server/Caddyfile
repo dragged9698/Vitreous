@@ -1,4 +1,4 @@
-ice.plezy.app {
+ice.vitreous.app {
 	log {
 		output stderr
 		level ERROR
@@ -10,6 +10,6 @@ ice.plezy.app {
 	}
 }
 
-bugs.plezy.app {
+bugs.vitreous.app {
 	reverse_proxy bugs:9000
 }

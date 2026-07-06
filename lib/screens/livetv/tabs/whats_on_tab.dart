@@ -21,8 +21,9 @@ import '../../../utils/grid_size_calculator.dart';
 import '../../../theme/mono_tokens.dart';
 import '../../../utils/app_logger.dart';
 import '../../../utils/provider_extensions.dart';
-import '../../../widgets/app_icon.dart';
 import '../../../widgets/focus_builders.dart';
+import '../../../widgets/emby_glass_chrome.dart';
+import '../../../widgets/live_tv/emby_live_tv_chrome.dart';
 import '../../../widgets/overlay_sheet.dart';
 import '../../../utils/scroll_utils.dart';
 import '../../../widgets/horizontal_scroll_with_arrows.dart';
@@ -175,7 +176,7 @@ class WhatsOnTabState extends State<WhatsOnTab> with LiveTvActionsMixin<WhatsOnT
     }
 
     if (_hubs.isEmpty) {
-      return Center(child: Text(t.liveTv.noPrograms));
+      return EmbyGlassStateCard(icon: Symbols.live_tv_rounded, message: t.liveTv.noPrograms);
     }
 
     return OverlaySheetHost(
@@ -436,24 +437,7 @@ class _LiveTvHubSectionState extends State<_LiveTvHubSection> with MountedSetSta
       crossAxisAlignment: .start,
       mainAxisSize: .min,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-          child: Row(
-            mainAxisSize: .min,
-            children: [
-              const AppIcon(Symbols.live_tv_rounded, fill: 1),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  widget.hub.title,
-                  style: Theme.of(context).textTheme.titleLarge,
-                  overflow: .ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-            ],
-          ),
-        ),
+        EmbyLiveTvSectionTitle(title: widget.hub.title),
 
         // Horizontal cards with locked focus control
         if (widget.hub.entries.isNotEmpty)

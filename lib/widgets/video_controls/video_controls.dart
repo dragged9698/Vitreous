@@ -173,6 +173,13 @@ effectiveVersionQualityControls({
 }
 
 @visibleForTesting
+List<MediaMarker> effectivePlaybackMarkers(
+  List<MediaMarker> raw, {
+  int? durationMs,
+}) =>
+    sanitizePlaybackMarkers(raw, durationMs: durationMs);
+
+@visibleForTesting
 bool shouldShowSkipMarkerButton({
   required bool hasFirstFrame,
   required bool hasMarker,
@@ -459,7 +466,8 @@ class _PlexVideoControlsState extends State<PlexVideoControls>
   Future<void>? _lastDispatchedTimelineSeekFuture;
   // Current marker state
   MediaMarker? _currentMarker;
-  List<MediaMarker> _markers = [];
+  List<MediaMarker> _rawMarkers = [];
+  final Set<String> _passedMarkerKeys = {};
   bool _markersLoaded = false;
   // Playback state subscription for auto-hide timer
   StreamSubscription<bool>? _playingSubscription;
@@ -611,9 +619,10 @@ class _PlexVideoControlsState extends State<PlexVideoControls>
       _setControlsState(() {
         _chapters = [];
         _chaptersLoaded = false;
-        _markers = [];
+        _rawMarkers = [];
         _markersLoaded = false;
       });
+      _passedMarkerKeys.clear();
       _clearCurrentMarker();
       _loadPlaybackExtras();
     }
@@ -814,26 +823,10 @@ class _PlexVideoControlsState extends State<PlexVideoControls>
                                 child: ValueListenableBuilder<bool>(
                                   valueListenable: widget.hasFirstFrame ?? _fallbackHasFirstFrame,
                                   builder: (context, hasFrame, child) {
-                                    return Container(
-                                      decoration: BoxDecoration(
-                                        // Use solid black when loading, gradient when loaded
-                                        color: hasFrame ? null : Colors.black,
-                                        gradient: hasFrame
-                                            ? LinearGradient(
-                                                begin: Alignment.topCenter,
-                                                end: Alignment.bottomCenter,
-                                                colors: [
-                                                  Colors.black.withValues(alpha: 0.7),
-                                                  Colors.transparent,
-                                                  Colors.transparent,
-                                                  Colors.black.withValues(alpha: 0.7),
-                                                ],
-                                                stops: const [0.0, 0.2, 0.8, 1.0],
-                                              )
-                                            : null,
-                                      ),
-                                      child: child,
-                                    );
+                                    if (!hasFrame) {
+                                      return const ColoredBox(color: Colors.black);
+                                    }
+                                    return child!;
                                   },
                                   child: isMobile
                                       ? Listener(

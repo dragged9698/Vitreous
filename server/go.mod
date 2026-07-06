@@ -1,4 +1,4 @@
-module github.com/edde746/plezy-relay
+module github.com/dragged9698/Vitreous-relay
 
 go 1.22
 

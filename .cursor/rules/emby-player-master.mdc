@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Emby Player — Master Ruleset
 
-**Context:** High-performance **Emby-only** media client forked from Plezy. Linux is the primary dev target; also ships Android, iOS/macOS, Windows, tvOS. Core moat: **native MPV playback** + multi-profile/multi-server UX + offline downloads.
+**Context:** **Vitreous** — high-performance **Emby-only** media client (successor to Plezy). Linux is the primary dev target; also ships Android, iOS/macOS, Windows, tvOS. Core moat: **native MPV playback** + multi-profile/multi-server UX + offline downloads.
 
 ## Domain hierarchy
 
@@ -18,7 +18,7 @@ packages/emby_core — standalone Emby REST client (DTOs, auth, repositories)
 
 ## Non-negotiables
 
-1. **Emby-only backend** — `MediaBackend.emby`; legacy jellyfin/plex IDs map to emby; new features target Emby API only unless explicitly porting legacy Plezy surface.
+1. **Emby-only backend** — `MediaBackend.emby`; legacy jellyfin/plex IDs map to emby; new features target Emby API only unless explicitly porting legacy Vitreous surface.
 2. **Layer boundaries** — UI/providers never call Dio/HTTP directly; go through `MediaDataSource` / `EmbyClient` / `emby_core`.
 3. **Codegen discipline** — run `scripts/codegen.sh` after model/i18n changes; never hand-edit `*.g.dart` / `*.freezed.dart`.
 4. **CI bar** — `scripts/ci_checks.sh` must pass: format, codegen freshness, native format, `flutter analyze` (warnings = fail), unused code/files.

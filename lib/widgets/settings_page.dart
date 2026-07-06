@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'focused_scroll_scaffold.dart';
+import 'emby_glass_settings.dart';
+import 'emby_glass_shell.dart';
 
 /// Standard scaffold for settings pages made of ordinary list rows.
 class SettingsPage extends StatelessWidget {
@@ -38,7 +39,7 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pageSlivers = slivers ?? [_buildListSliver()];
-    return FocusedScrollScaffold(
+    return EmbyGlassScrollScaffold(
       title: title,
       actions: actions,
       pinned: pinned,
@@ -49,9 +50,6 @@ class SettingsPage extends StatelessWidget {
   }
 
   Widget _buildListSliver() {
-    final list = SliverList(delegate: SliverChildListDelegate(children!));
-    final pagePadding = padding;
-    if (pagePadding == null) return list;
-    return SliverPadding(padding: pagePadding, sliver: list);
+    return EmbyGlassSettingsSliver(padding: padding, children: children!);
   }
 }

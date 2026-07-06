@@ -46,6 +46,11 @@ extension _VideoPlayerPipMethods on VideoPlayerScreenState {
 
     _videoPIPManager ??= VideoPIPManager(player: currentPlayer, initialPlayerSize: initialPlayerSize);
     _videoPIPManager!.onBeforeEnterPip = _preparePipFiltersForEntry;
+    _videoPIPManager!.pipResizeLocksAspectRatio = () {
+      final filterManager = _videoFilterManager;
+      if (filterManager != null) return filterManager.pipResizeLocksAspectRatio;
+      return SettingsService.instance.read(SettingsService.defaultBoxFitMode) == 0;
+    };
     _attachPipStateListener();
   }
 

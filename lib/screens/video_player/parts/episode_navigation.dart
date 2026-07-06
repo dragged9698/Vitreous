@@ -296,13 +296,33 @@ extension _VideoPlayerEpisodeNavigationMethods on VideoPlayerScreenState {
       }
       if (!isCurrentReload()) return true;
 
-      // Overlap the old item's stop report with the resolve round-trip; it
-      // is awaited again right before the open below.
-      final stoppedProgressFuture = _sendStoppedProgressOnce();
+      final reloadResumePosition = resumePosition ?? currentPlayer.state.position;
+      appLogger.i(
+        '[EmbyPlayback] reload-resume',
+        error: {
+          'reason': reason,
+          'positionMs': reloadResumePosition.inMilliseconds,
+          'qualityPreset': targetQualityPreset.name,
+        },
+      );
+      // End the active server session before negotiating a replacement stream.
+      // PlaybackInfo can otherwise reuse a stale StartTimeTicks from the
+      // direct-stream session when switching to transcode mid-playback.
+      await _sendStoppedProgressOnce(positionOverride: reloadResumePosition);
+      _progressTracker?.resumeAfterStoppedReport();
+
+      final previousPlaySessionId = _playbackPlaySessionId;
+      await _closePreviousEmbyStreamIfNeeded(
+        metadata: previousMetadata,
+        playSessionId: previousPlaySessionId,
+      );
+
+      final metadataForResolve = metadata.copyWith(viewOffsetMs: reloadResumePosition.inMilliseconds);
+      _currentMetadata = metadataForResolve;
 
       final playbackResolver = PlaybackSourceResolver(serverManager: serverManager, database: database);
       final playbackContext = await playbackResolver.resolve(
-        metadata: metadata,
+        metadata: metadataForResolve,
         selectedMediaIndex: targetMediaIndex,
         selectedMediaSourceId: selectedMediaSourceId,
         offlineLibraryMode: _offlineLibraryMode,
@@ -334,10 +354,10 @@ extension _VideoPlayerEpisodeNavigationMethods on VideoPlayerScreenState {
       }
 
       final openResumePosition = await _resolveOpenResumePosition(
-        metadata: metadata,
+        metadata: metadataForResolve,
         isOffline: _offlineLibraryMode || result.isOffline,
         offlineWatchService: offlineWatchService,
-        requested: resumePosition,
+        requested: reloadResumePosition,
       );
       if (!isCurrentReload()) return true;
 
@@ -369,12 +389,11 @@ extension _VideoPlayerEpisodeNavigationMethods on VideoPlayerScreenState {
       );
       if (!isCurrentReload()) return true;
       final openTiming = _playbackOpenTiming(
-        backend: metadata.backend,
+        backend: metadataForResolve.backend,
         isTranscoding: result.isTranscoding,
         resumePosition: openResumePosition,
-        durationMs: metadata.durationMs,
+        durationMs: metadataForResolve.durationMs,
       );
-      await stoppedProgressFuture;
       _progressTracker?.stopTracking();
       _progressTracker?.dispose();
       _progressTracker = null;

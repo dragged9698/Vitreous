@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../i18n/strings.g.dart';
 import '../utils/platform_detector.dart';
@@ -19,6 +20,16 @@ class NavigationTab {
 
   NavigationDestination toDestination() {
     return NavigationDestination(icon: AppIcon(icon, fill: 1), selectedIcon: AppIcon(icon, fill: 1), label: getLabel());
+  }
+
+  /// Glass bottom-bar tab (iOS 26 UITabBar style).
+  GlassTab toGlassTab({required bool hideLabel}) {
+    return GlassTab(
+      icon: AppIcon(icon, fill: 1),
+      activeIcon: AppIcon(icon, fill: 1),
+      label: hideLabel ? null : getLabel(),
+      semanticLabel: getLabel(),
+    );
   }
 
   /// Get the index for a tab ID in the visible tabs list

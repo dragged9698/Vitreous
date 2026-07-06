@@ -10,18 +10,18 @@
 
   const { data } = $props();
 
-  const title = "Plezy - A Beautiful Plex & Jellyfin Client";
-  const description = "Plezy is a beautiful client for Plex and Jellyfin, available on iOS, Android, Android TV, tvOS, Windows, macOS, and Linux. HDR, Dolby Vision, offline downloads, and more.";
-  const url = "https://plezy.app/";
-  const image = "https://plezy.app/og/plezy-social.png";
+  const title = "Vitreous - A Beautiful Plex & Jellyfin Client";
+  const description = "Vitreous is a beautiful client for Plex and Jellyfin, available on iOS, Android, Android TV, tvOS, Windows, macOS, and Linux. HDR, Dolby Vision, offline downloads, and more.";
+  const url = "https://vitreous.app/";
+  const image = "https://vitreous.app/og/vitreous-social.png";
 
   const softwareAppSchema = $derived.by(() => {
     const schema: Record<string, unknown> = {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      "name": "Plezy",
+      "name": "Vitreous",
       "description": description,
-      "url": "https://plezy.app",
+      "url": "https://vitreous.app",
       "applicationCategory": "MultimediaApplication",
       "operatingSystem": "iOS, Android, Android TV, tvOS, Windows, macOS, Linux",
       "offers": [
@@ -34,7 +34,7 @@
         },
         {
           "@type": "Offer",
-          "url": "https://play.google.com/store/apps/details?id=com.edde746.plezy",
+          "url": "https://play.google.com/store/apps/details?id=com.dragged9698.vitreous",
           "price": data.playStorePrice ?? "0",
           "priceCurrency": "USD",
           "category": "Google Play"
@@ -46,7 +46,7 @@
         },
         {
           "@type": "Offer",
-          "url": "https://github.com/edde746/plezy",
+          "url": "https://github.com/dragged9698/Vitreous",
           "price": "0",
           "priceCurrency": "USD",
           "category": "GitHub"
@@ -80,7 +80,7 @@
   <link rel="canonical" href={url} />
 
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Plezy" />
+  <meta property="og:site_name" content="Vitreous" />
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
   <meta property="og:url" content={url} />

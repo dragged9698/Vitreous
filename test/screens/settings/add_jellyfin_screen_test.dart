@@ -19,7 +19,7 @@ Profile _profile(String id) =>
 
 JellyfinConnectionAuthService _jellyfinAuthService({bool quickConnectEnabled = false, Duration? initiateDelay}) {
   return JellyfinConnectionAuthService(
-    clientName: 'Plezy',
+    clientName: 'Vitreous',
     clientVersion: 'test',
     deviceName: 'TestDevice',
     testHttpClientFactory: () => MockClient((request) async {
@@ -54,7 +54,7 @@ JellyfinConnectionAuthService _jellyfinAuthService({bool quickConnectEnabled = f
 
 JellyfinConnectionAuthService _jellyfinAuthServiceForBareHost() {
   return JellyfinConnectionAuthService(
-    clientName: 'Plezy',
+    clientName: 'Vitreous',
     clientVersion: 'test',
     deviceName: 'TestDevice',
     testHttpClientFactory: () => MockClient((request) async {

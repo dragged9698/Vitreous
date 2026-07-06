@@ -1,5 +1,5 @@
 name: emby_player
-description: "High-performance Emby client for Linux — forked from Plezy"
+description: "Vitreous — high-performance Emby media client for Linux, Android, iOS, macOS, Windows, and tvOS."
 publish_to: "none"
 version: 2.8.0+119
 
@@ -81,7 +81,7 @@ dependencies:
   flutter_animate: ^4.5.2
   emby_core:
     path: packages/emby_core
-
+  liquid_glass_widgets: ^0.19.5
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -130,17 +130,19 @@ dependency_overrides:
       ref: 1d8cd83
 
 sentry:
-  org: plezy
-  project: plezy
-  url: https://bugs.plezy.app
+  org: vitreous
+  project: vitreous
+  url: https://bugs.vitreous.app
   upload_sources: true
   commits: false
 
 flutter:
   uses-material-design: true
+  shaders:
+    - shaders/vitreous_glass.frag
   assets:
-    - assets/plezy.png
-    - assets/plezy_adaptive_foreground.svg
+    - assets/vitreous.png
+    - assets/vitreous_adaptive_foreground.svg
     - assets/plex_chevron.svg
     - assets/jellyfin_icon.svg
     - assets/trakt_circlemark.svg

@@ -431,14 +431,14 @@ class _AddEmbyScreenState extends State<AddEmbyScreen> with AsyncFormStateMixin,
     if (authServiceFactory != null) return await authServiceFactory();
     final pkg = await PackageInfo.fromPlatform();
     final deviceName = await _resolveDeviceName();
-    return EmbyConnectionAuthService(clientName: 'Plezy', clientVersion: pkg.version, deviceName: deviceName);
+    return EmbyConnectionAuthService(clientName: 'Vitreous', clientVersion: pkg.version, deviceName: deviceName);
   }
 
   Future<String> _resolveDeviceName() async {
     // PackageInfo doesn't expose a device name; fall back to a generic label.
     // Emby only shows this in the admin "Devices" list — fine to keep
     // simple until we add proper device_info_plus integration.
-    return 'Plezy';
+    return 'Vitreous';
   }
 
   @override

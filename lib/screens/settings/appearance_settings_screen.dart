@@ -7,11 +7,9 @@ import 'package:provider/provider.dart';
 
 import '../../i18n/strings.g.dart';
 import '../../providers/multi_server_provider.dart';
-import '../../providers/theme_provider.dart';
 import '../../profiles/active_profile_provider.dart';
 import '../../navigation/navigation_tabs.dart';
 import '../../services/settings_service.dart' hide ThemeMode;
-import '../../services/settings_service.dart' as settings show ThemeMode;
 import '../../focus/focusable_slider.dart';
 import '../../services/device_performance.dart';
 import '../../utils/platform_detector.dart';
@@ -31,7 +29,6 @@ class AppearanceSettingsScreen extends StatelessWidget {
       title: Text(t.settings.appearance),
       children: [
         SettingsSectionHeader(t.settings.display),
-        _themeSelector(),
         _languageSelector(context),
         _densitySelector(),
         _viewModeSelector(),
@@ -168,25 +165,6 @@ class AppearanceSettingsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 24),
       ],
-    );
-  }
-
-  Widget _themeSelector() {
-    return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, _) {
-        return SegmentedSetting<settings.ThemeMode>(
-          icon: themeProvider.themeModeIcon,
-          title: t.settings.theme,
-          segments: [
-            ButtonSegment(value: settings.ThemeMode.system, label: Text(t.settings.systemTheme)),
-            ButtonSegment(value: settings.ThemeMode.light, label: Text(t.settings.lightTheme)),
-            ButtonSegment(value: settings.ThemeMode.dark, label: Text(t.settings.darkTheme)),
-            ButtonSegment(value: settings.ThemeMode.oled, label: Text(t.settings.oledTheme)),
-          ],
-          selected: themeProvider.themeMode,
-          onChanged: themeProvider.setThemeMode,
-        );
-      },
     );
   }
 

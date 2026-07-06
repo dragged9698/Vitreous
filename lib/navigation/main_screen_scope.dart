@@ -15,8 +15,8 @@ enum MainScreenScopeAspect {
   /// `isSidebarFocused`.
   focus,
 
-  /// `foregroundWidth` / `viewportWidth` / `reservedSideNavigationWidth` —
-  /// stable across sidebar flips (only change with window geometry).
+  /// `foregroundWidth` / `viewportWidth` / `reservedSideNavigationWidth` /
+  /// `sidebarOverlaysContent` — stable across sidebar flips (tab / window changes).
   layout,
 }
 
@@ -29,6 +29,9 @@ class MainScreenFocusScope extends InheritedModel<MainScreenScopeAspect> {
   final double? foregroundLeft;
   final double? foregroundWidth;
   final double? viewportWidth;
+  /// When true (Discover/home), content is full-bleed and the side rail floats
+  /// above. When false, content is inset and the rail pushes the layout.
+  final bool sidebarOverlaysContent;
   final void Function(String libraryGlobalKey)? selectLibrary;
   final VoidCallback? openSettings;
 
@@ -42,6 +45,7 @@ class MainScreenFocusScope extends InheritedModel<MainScreenScopeAspect> {
     this.foregroundLeft,
     this.foregroundWidth,
     this.viewportWidth,
+    this.sidebarOverlaysContent = false,
     this.selectLibrary,
     this.openSettings,
     required super.child,
@@ -91,6 +95,18 @@ class MainScreenFocusScope extends InheritedModel<MainScreenScopeAspect> {
     return MediaQuery.sizeOf(context).width;
   }
 
+  /// Minimum left inset for readable content beside the floating side rail.
+  static double reservedSideNavigationWidthOf(BuildContext context) {
+    final width = _dependOn(context, MainScreenScopeAspect.layout)?.reservedSideNavigationWidth;
+    if (width != null && width > 0) return width;
+    return 0.0;
+  }
+
+  /// True on Discover — hero bleeds under the rail; other tabs push content.
+  static bool sidebarOverlaysContentOf(BuildContext context) {
+    return _dependOn(context, MainScreenScopeAspect.layout)?.sidebarOverlaysContent ?? false;
+  }
+
   @override
   bool updateShouldNotify(MainScreenFocusScope oldWidget) {
     return isSidebarFocused != oldWidget.isSidebarFocused ||
@@ -98,7 +114,8 @@ class MainScreenFocusScope extends InheritedModel<MainScreenScopeAspect> {
         reservedSideNavigationWidth != oldWidget.reservedSideNavigationWidth ||
         foregroundLeft != oldWidget.foregroundLeft ||
         foregroundWidth != oldWidget.foregroundWidth ||
-        viewportWidth != oldWidget.viewportWidth;
+        viewportWidth != oldWidget.viewportWidth ||
+        sidebarOverlaysContent != oldWidget.sidebarOverlaysContent;
   }
 
   @override
@@ -113,7 +130,8 @@ class MainScreenFocusScope extends InheritedModel<MainScreenScopeAspect> {
     if (dependencies.contains(MainScreenScopeAspect.layout) &&
         (foregroundWidth != oldWidget.foregroundWidth ||
             viewportWidth != oldWidget.viewportWidth ||
-            reservedSideNavigationWidth != oldWidget.reservedSideNavigationWidth)) {
+            reservedSideNavigationWidth != oldWidget.reservedSideNavigationWidth ||
+            sidebarOverlaysContent != oldWidget.sidebarOverlaysContent)) {
       return true;
     }
     return false;

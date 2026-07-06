@@ -9,6 +9,9 @@ project(runner LANGUAGES CXX)
 add_executable(${BINARY_NAME}
   "main.cc"
   "my_application.cc"
+  "window_keep_above.cc"
+  "window_keep_above_kde.cc"
+  "window_pip.cc"
   "mpv/mpv_player.cc"
   "mpv/mpv_plugin.cc"
   "mpv/mpv_texture.cc"
@@ -28,6 +31,9 @@ pkg_check_modules(MPV REQUIRED IMPORTED_TARGET mpv)
 # Find epoxy (OpenGL loader).
 pkg_check_modules(EPOXY REQUIRED IMPORTED_TARGET epoxy)
 
+# mpv_plugin.cc uses XInternAtom / XSendEvent for KDE keep-above on X11.
+pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11)
+
 # Build simdutf as a static library from the single-header amalgamation.
 add_library(simdutf STATIC "${simdutf_SOURCE_DIR}/simdutf.cpp")
 target_include_directories(simdutf PUBLIC "${simdutf_SOURCE_DIR}")
@@ -40,7 +46,9 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::MPV)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::EPOXY)
+target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::X11)
 target_link_libraries(${BINARY_NAME} PRIVATE simdutf)
 
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
+target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/../shared/cpp")

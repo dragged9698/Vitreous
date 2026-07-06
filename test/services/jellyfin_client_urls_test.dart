@@ -1521,8 +1521,8 @@ void main() {
       final auth = headers['Authorization'];
       expect(auth, isNotNull);
       expect(auth, startsWith('MediaBrowser '));
-      expect(auth, contains('Client="Plezy"'));
-      expect(auth, contains('Device="Plezy"'));
+      expect(auth, contains('Client="Vitreous"'));
+      expect(auth, contains('Device="Vitreous"'));
       expect(auth, contains('DeviceId="dev-xyz"'));
       expect(auth, contains(RegExp(r'Version="[^"]+"')));
       expect(auth, contains('Token="tok-abc"'));
@@ -1598,8 +1598,8 @@ void main() {
       expect(captured!.path, '/Items/Filters');
       expect(captured!.queryParameters['ParentId'], 'lib-1');
       expect(captured!.queryParameters['userId'], 'user-1');
-      expect(captured!.queryParameters['Recursive'], 'true');
       expect(captured!.queryParameters['IncludeItemTypes'], 'Movie,Series');
+      expect(captured!.queryParameters.containsKey('Recursive'), isFalse);
       expect(result.filters.map((filter) => filter.filter), ['unwatched', 'genre', 'year', 'contentRating', 'tag']);
       expect(result.filters.first.filterType, 'boolean');
       expect(result.filters.first.key, 'jellyfin:unwatched');
@@ -1607,6 +1607,40 @@ void main() {
       expect(result.cachedValues.containsKey('unwatched'), isFalse);
       expect(result.cachedValues['genre']!.map((value) => value.key), ['Action', 'Drama']);
       expect(result.cachedValues['year']!.map((value) => value.key), ['2024', '1999']);
+    });
+
+    test('fetchLibraryFiltersWithValues falls back to Filters2 when legacy genres are empty', () async {
+      final captured = <Uri>[];
+      final scoped = JellyfinClient.forTesting(
+        connection: _conn(),
+        httpClient: MockClient((req) async {
+          captured.add(req.url);
+          if (req.url.path.endsWith('/Items/Filters')) {
+            return http.Response(
+              jsonEncode({'Genres': <String>[], 'Tags': <String>[], 'OfficialRatings': <String>[], 'Years': <int>[]}),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'Genres': [
+                {'Name': 'Action', 'Id': 'genre-action'},
+                {'Name': 'Drama', 'Id': 'genre-drama'},
+              ],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      addTearDown(scoped.close);
+
+      final result = await scoped.fetchLibraryFiltersWithValues('lib-1', libraryKind: MediaKind.show);
+
+      expect(captured.map((uri) => uri.path), ['/Items/Filters', '/Items/Filters2']);
+      expect(result.filters.map((filter) => filter.filter), ['unwatched', 'genre']);
+      expect(result.cachedValues['genre']!.map((value) => value.key), ['Action', 'Drama']);
     });
 
     test('fetchLibraryContent uses sentinel total fallback when server omits total', () async {

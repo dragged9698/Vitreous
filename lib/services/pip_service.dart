@@ -7,7 +7,7 @@ import 'package:emby_player/i18n/strings.g.dart';
 import 'desktop_pip_service.dart';
 
 class PipService {
-  static const MethodChannel _channel = MethodChannel('com.plezy/pip');
+  static const MethodChannel _channel = MethodChannel('com.vitreous/pip');
 
   /// PiP is implemented natively on Android, iOS, and macOS; desktop Linux/Windows
   /// use a resizable always-on-top window via [DesktopPipService].
@@ -69,9 +69,17 @@ class PipService {
     await _channel.invokeMethod('exit');
   }
 
-  static Future<(bool success, String? error)> enter({int? width, int? height}) async {
+  static Future<(bool success, String? error)> enter({
+    int? width,
+    int? height,
+    bool lockAspectRatio = false,
+  }) async {
     if (_isDesktopAvailable) {
-      final ok = await DesktopPipService.enter();
+      final ok = await DesktopPipService.enter(
+        videoWidth: width,
+        videoHeight: height,
+        lockAspectRatio: lockAspectRatio,
+      );
       return (ok, ok ? null : t.videoControls.pipErrors.failed);
     }
     if (!_isNativeAvailable) return (false, null);

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:emby_player/utils/formatters.dart';
+import 'package:emby_player/widgets/app_icon.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../media/media_item.dart';
-import '../../../i18n/strings.g.dart';
 import '../../../watch_together/widgets/watch_together_overlay.dart';
 import '../../../watch_together/providers/watch_together_provider.dart';
-import '../../app_bar_back_button.dart';
 
 /// Header layout style for video controls
 enum VideoHeaderStyle {
@@ -25,6 +25,12 @@ class VideoControlsHeader extends StatelessWidget {
   final MediaItem metadata;
   final VideoHeaderStyle style;
 
+  /// When true, the header sizes to its content instead of expanding full width.
+  final bool compactWidth;
+
+  /// Max width for title text when [compactWidth] is true.
+  final double? maxTitleWidth;
+
   /// Optional trailing widget (e.g., track/chapter controls)
   final Widget? trailing;
 
@@ -35,21 +41,32 @@ class VideoControlsHeader extends StatelessWidget {
     super.key,
     required this.metadata,
     this.style = VideoHeaderStyle.multiLine,
+    this.compactWidth = false,
+    this.maxTitleWidth,
     this.trailing,
     this.onBack,
   });
 
   @override
   Widget build(BuildContext context) {
+    final title = style == VideoHeaderStyle.singleLine ? _buildSingleLineTitle() : _buildMultiLineTitle();
+    final titleWidget = compactWidth
+        ? ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxTitleWidth ?? 560),
+            child: title,
+          )
+        : Expanded(child: title);
+
     return Row(
+      mainAxisSize: compactWidth ? MainAxisSize.min : MainAxisSize.max,
       children: [
-        AppBarBackButton(
-          style: BackButtonStyle.video,
-          semanticLabel: t.common.back,
+        IconButton(
+          icon: const AppIcon(Symbols.arrow_back_ios_new_rounded, size: 20, color: Colors.white),
           onPressed: onBack ?? () => Navigator.of(context).pop(true),
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
         ),
-        const SizedBox(width: 16),
-        Expanded(child: style == VideoHeaderStyle.singleLine ? _buildSingleLineTitle() : _buildMultiLineTitle()),
+        const SizedBox(width: 8),
+        titleWidget,
         Selector<WatchTogetherProvider, bool>(
           selector: (_, p) => p.isInSession,
           builder: (context, inSession, child) {

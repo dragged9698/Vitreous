@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "Plezy"
+    "title": "Vitreous"
   },
   "auth": {
     "signIn": "Sign in",
@@ -86,7 +86,7 @@
   },
   "settings": {
     "title": "Settings",
-    "supportDeveloper": "Support Plezy",
+    "supportDeveloper": "Support Vitreous",
     "supportDeveloperDescription": "Donate via Liberapay to fund development",
     "language": "Language",
     "theme": "Theme",
@@ -202,7 +202,7 @@
     "importSettingsConfirm": "This will replace your current settings. Continue?",
     "importSettingsSuccess": "Settings imported",
     "importSettingsFailed": "Could not import settings",
-    "importSettingsInvalidFile": "This file isn't a valid Plezy settings export",
+    "importSettingsInvalidFile": "This file isn't a valid Vitreous settings export",
     "importSettingsNoUser": "Sign in before importing settings",
     "shortcutsReset": "Shortcuts reset to defaults",
     "about": "About",
@@ -292,7 +292,7 @@
     "forceTvMode": "Force TV mode",
     "forceTvModeDescription": "Force TV layout. For devices that don't auto-detect. Requires restart.",
     "startInFullscreen": "Start in fullscreen",
-    "startInFullscreenDescription": "Open Plezy in fullscreen mode at launch",
+    "startInFullscreenDescription": "Open Vitreous in fullscreen mode at launch",
     "exitFullscreenOnPlayerClose": "Exit fullscreen on player close",
     "exitFullscreenOnPlayerCloseDescription": "Automatically exit fullscreen when closing the video player",
     "autoHidePerformanceOverlay": "Auto-Hide Performance Overlay",
@@ -300,7 +300,7 @@
     "showNavBarLabels": "Show Navigation Bar Labels",
     "showNavBarLabelsDescription": "Display text labels under navigation bar icons",
     "startupSection": "Startup Section",
-    "startupSectionDescription": "Choose which section Plezy opens to when it starts",
+    "startupSectionDescription": "Choose which section Vitreous opens to when it starts",
     "openLibraryDirectly": "Open library directly",
     "openLibraryDirectlyDescription": "When startup is Libraries, open your last selected library browse view",
     "alwaysOnTopMode": "Always on top",
@@ -507,6 +507,7 @@
     "volumeSlider": "Volume level",
     "endsAt": "Ends at ${time}",
     "pipActive": "Playing in Picture-in-Picture",
+    "exitPipButton": "Exit picture-in-picture",
     "pipFailed": "Picture-in-picture failed to start",
     "screenshotSaved": "Screenshot saved",
     "zoomPercent": "Zoom ${percent}%",
@@ -624,7 +625,7 @@
     "confirmAction": "Confirm Action"
   },
   "profiles": {
-    "addPlezyProfile": "Add Plezy profile",
+    "addVitreousProfile": "Add Vitreous profile",
     "switchingProfile": "Switching profile…",
     "deleteThisProfileTitle": "Delete this profile?",
     "deleteThisProfileMessage": "Remove ${displayName}. Connections aren't affected.",
@@ -692,7 +693,7 @@
     "sessionExpiredMany": "Session expired for ${count} servers",
     "signInAgain": "Sign in again",
     "editJellyfinTitle": "Edit Jellyfin connection",
-    "editJellyfinIntro": "Add or remove URLs for ${serverName}. Plezy will use the reachable URL with the lowest latency."
+    "editJellyfinIntro": "Add or remove URLs for ${serverName}. Vitreous will use the reachable URL with the lowest latency."
   },
   "discover": {
     "title": "Discover",
@@ -878,6 +879,7 @@
     "whatsOn": "What's On",
     "watchChannel": "Watch Channel",
     "favorites": "Favorites",
+    "channelCount": "${count} channels",
     "reorderFavorites": "Reorder Favorites",
     "joinSession": "Join Session in Progress",
     "watchFromStart": "Watch from start (${minutes} min ago)",
@@ -1149,19 +1151,19 @@
       "minimize": "Minimize"
     },
     "pairing": {
-      "discoveryDescription": "Plezy devices with the same Plex account appear here",
+      "discoveryDescription": "Vitreous devices with the same Plex account appear here",
       "hostAddressHint": "192.168.1.100:48632",
       "connecting": "Connecting...",
       "searchingForDevices": "Looking for devices...",
       "noDevicesFound": "No devices found on your network",
-      "noDevicesHint": "Open Plezy on desktop and use the same WiFi",
+      "noDevicesHint": "Open Vitreous on desktop and use the same WiFi",
       "availableDevices": "Available Devices",
       "manualConnection": "Manual Connection",
       "cryptoInitFailed": "Couldn't start secure connection. Sign in to Plex first.",
       "validationHostRequired": "Please enter host address",
       "validationHostFormat": "Format must be IP:port (e.g., 192.168.1.100:48632)",
       "connectionTimedOut": "Connection timed out. Use the same network on both devices.",
-      "sessionNotFound": "Device not found. Make sure Plezy is running on the host.",
+      "sessionNotFound": "Device not found. Make sure Vitreous is running on the host.",
       "authFailed": "Authentication failed. Both devices need the same Plex account.",
       "failedToConnect": "Failed to connect: ${error}"
     },
@@ -1370,11 +1372,11 @@
     "connected": "Connected",
     "connectedAs": "Connected as @${username}",
     "disconnectConfirm": "Disconnect Trakt account?",
-    "disconnectConfirmBody": "Plezy will stop sending events to Trakt. You can reconnect any time.",
+    "disconnectConfirmBody": "Vitreous will stop sending events to Trakt. You can reconnect any time.",
     "scrobble": "Real-time scrobbling",
     "scrobbleDescription": "Send play, pause, and stop events to Trakt during playback.",
     "watchedSync": "Sync watched status",
-    "watchedSyncDescription": "When you mark items watched in Plezy, mark them on Trakt."
+    "watchedSyncDescription": "When you mark items watched in Vitreous, mark them on Trakt."
   },
   "trackers": {
     "title": "Trackers",
@@ -1384,7 +1386,7 @@
     "scrobble": "Track progress automatically",
     "scrobbleDescription": "Update your list when you finish an episode or movie.",
     "disconnectConfirm": "Disconnect ${service}?",
-    "disconnectConfirmBody": "Plezy will stop updating ${service}. Reconnect any time.",
+    "disconnectConfirmBody": "Vitreous will stop updating ${service}. Reconnect any time.",
     "connectFailed": "Couldn't connect to ${service}. Try again.",
     "services": {
       "mal": "MyAnimeList",
@@ -1392,7 +1394,7 @@
       "simkl": "Simkl"
     },
     "deviceCode": {
-      "title": "Activate Plezy on ${service}",
+      "title": "Activate Vitreous on ${service}",
       "body": "Visit ${url} and enter this code:",
       "openToActivate": "Open ${service} to activate",
       "waitingForAuthorization": "Waiting for authorization…",

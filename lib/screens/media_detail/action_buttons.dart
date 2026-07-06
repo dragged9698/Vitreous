@@ -2,6 +2,9 @@ part of '../media_detail_screen.dart';
 
 extension _MediaDetailActionButtons on _MediaDetailScreenState {
   Widget _buildActionButtons(MediaItem metadata) {
+    if (_useInfuseDetailLayout(context)) {
+      return _buildInfuseActionButtons(metadata);
+    }
     final isTv = PlatformDetector.isTV();
     final tvScale = TvLayoutConstants.scaleOf(context);
     final actionSize = isTv ? _tvDetailActionSize * tvScale : 48.0;
@@ -291,6 +294,230 @@ extension _MediaDetailActionButtons on _MediaDetailScreenState {
           return actionBar(allActions);
         }
         return actionBar(compactActionsFor(maxWidth));
+      },
+    );
+  }
+
+  Widget _buildInfuseActionButtons(MediaItem metadata) {
+    final playButtonLabel = _getInfusePlayLabel(metadata);
+    final playIcon = _getPlayButtonIcon(metadata);
+    final playProgress = _getInfusePlayProgress(metadata);
+    final primaryTrailer = _getPrimaryTrailer();
+    final isKeyboardMode = InputModeTracker.isKeyboardMode(context);
+
+    Future<void> onPlayPressed() async {
+      if (metadata.isShow) {
+        if (_onDeckEpisode != null) {
+          await navigateToVideoPlayerWithRefresh(
+            context,
+            metadata: _onDeckEpisode!,
+            isOffline: widget.isOffline,
+            onRefresh: _loadFullMetadata,
+          );
+        } else {
+          await _playFirstEpisode();
+        }
+      } else if (metadata.isSeason) {
+        if (_episodes.isNotEmpty) {
+          await navigateToVideoPlayerWithRefresh(
+            context,
+            metadata: _episodes.first,
+            isOffline: widget.isOffline,
+            onRefresh: _loadFullMetadata,
+          );
+        } else {
+          await _playFirstEpisode();
+        }
+      } else {
+        await navigateToVideoPlayerWithRefresh(
+          context,
+          metadata: metadata,
+          isOffline: widget.isOffline,
+          onRefresh: _loadFullMetadata,
+        );
+      }
+    }
+
+    final VoidCallback? onPlayTrailer = primaryTrailer == null
+        ? null
+        : () => unawaited(navigateToVideoPlayer(context, metadata: primaryTrailer));
+
+    Widget watchedUtility(FocusableActionBuildState state) {
+      return EmbyInfuseUtilityButton(
+        icon: metadata.isWatched ? Symbols.remove_done_rounded : Symbols.visibility_rounded,
+        tooltip: metadata.isWatched ? t.tooltips.markAsUnwatched : t.tooltips.markAsWatched,
+        onPressed: () => unawaited(_handleWatchedTogglePressed(metadata)),
+        isActive: metadata.isWatched,
+        showFocus: state.showFocus,
+      );
+    }
+
+    Widget favoriteUtility(FocusableActionBuildState state) {
+      return EmbyInfuseUtilityButton(
+        icon: metadata.isFavorite ? Symbols.favorite_rounded : Symbols.favorite_border_rounded,
+        tooltip: metadata.isFavorite ? t.tooltips.removeFavorite : t.tooltips.addFavorite,
+        onPressed: () => unawaited(_handleFavoriteTogglePressed(metadata)),
+        isActive: metadata.isFavorite,
+        activeColor: Colors.red.shade300,
+        showFocus: state.showFocus,
+      );
+    }
+
+    Widget shuffleUtility(FocusableActionBuildState state) {
+      return EmbyInfuseUtilityButton(
+        icon: Symbols.shuffle_rounded,
+        tooltip: t.tooltips.shufflePlay,
+        onPressed: () async => _handleShufflePlayWithQueue(context, metadata),
+        showFocus: state.showFocus,
+      );
+    }
+
+    Widget moreUtility(FocusableActionBuildState state) {
+      return EmbyInfuseUtilityButton(
+        icon: Symbols.more_horiz_rounded,
+        tooltip: t.common.addTo,
+        onPressed: () => _contextMenuKey.currentState?.showContextMenu(context),
+        showFocus: state.showFocus,
+      );
+    }
+
+    final utilities = <FocusableAction>[
+      FocusableAction(
+        debugLabel: 'detail_watched',
+        onPressed: () => unawaited(_handleWatchedTogglePressed(metadata)),
+        builder: (context, state) => watchedUtility(state),
+      ),
+      if (!widget.isOffline)
+        FocusableAction(
+          debugLabel: 'detail_favorite',
+          onPressed: () => unawaited(_handleFavoriteTogglePressed(metadata)),
+          builder: (context, state) => favoriteUtility(state),
+        ),
+      if (!widget.isOffline && !PlatformDetector.isAppleTV())
+        FocusableAction(
+          debugLabel: 'detail_download',
+          onPressed: () => unawaited(_handleDownloadButtonPressed(metadata)),
+          builder: (context, state) => _buildInfuseDownloadUtility(metadata, state.showFocus),
+        ),
+      if (metadata.isShow || metadata.isSeason)
+        FocusableAction(
+          debugLabel: 'detail_shuffle',
+          onPressed: () async => _handleShufflePlayWithQueue(context, metadata),
+          builder: (context, state) => shuffleUtility(state),
+        ),
+      if (!widget.isOffline)
+        FocusableAction(
+          debugLabel: 'detail_more',
+          onPressed: () => _contextMenuKey.currentState?.showContextMenu(context),
+          builder: (context, state) => moreUtility(state),
+        ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FocusableActionBar(
+          actions: utilities,
+          spacing: 8,
+          onNavigateUp: _focusAboveActionRow,
+          onNavigateDown: _focusBelowActionRow,
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: Focus(
+                focusNode: _playButtonFocusNode,
+                autofocus: isKeyboardMode,
+                onKeyEvent: (node, event) {
+                  if (event is KeyDownEvent &&
+                      (event.logicalKey == LogicalKeyboardKey.enter ||
+                          event.logicalKey == LogicalKeyboardKey.space ||
+                          event.logicalKey == LogicalKeyboardKey.select)) {
+                    onPlayPressed();
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.ignored;
+                },
+                child: ListenableBuilder(
+                  listenable: _playButtonFocusNode,
+                  builder: (context, _) => EmbyInfusePlayPill(
+                    label: playButtonLabel,
+                    icon: playIcon,
+                    progress: playProgress,
+                    onPressed: onPlayPressed,
+                    showFocus: _playButtonFocusNode.hasFocus && isKeyboardMode,
+                  ),
+                ),
+              ),
+            ),
+            if (onPlayTrailer != null) ...[
+              const SizedBox(width: 12),
+              EmbyInfuseSecondaryPill(label: t.tooltips.playTrailer, onPressed: onPlayTrailer),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _getInfusePlayLabel(MediaItem metadata) {
+    if (metadata.isShow || metadata.isSeason) {
+      return _getPlayButtonLabel(metadata);
+    }
+    final item = metadata.isShow && _onDeckEpisode != null ? _fresh(_onDeckEpisode!) : _fresh(metadata);
+    if (item.viewOffsetMs != null && item.viewOffsetMs! > 0 && item.durationMs != null && item.durationMs! > 0) {
+      final pos = Duration(milliseconds: item.viewOffsetMs!);
+      return '${t.common.resume} ${formatDurationTimestamp(pos)}';
+    }
+    if (metadata.isMovie) return t.common.play;
+    return metadata.isEpisode ? _getPlayButtonLabel(metadata) : t.common.play;
+  }
+
+  double? _getInfusePlayProgress(MediaItem metadata) {
+    MediaItem? item;
+    if (metadata.isShow) {
+      item = _onDeckEpisode;
+    } else {
+      item = metadata;
+    }
+    if (item == null) return null;
+    final offset = item.viewOffsetMs;
+    final duration = item.durationMs;
+    if (offset == null || duration == null || duration <= 0) return null;
+    if (offset <= 0) return null;
+    return offset / duration;
+  }
+
+  Widget _buildInfuseDownloadUtility(MediaItem metadata, bool showFocus) {
+    return Consumer<DownloadProvider>(
+      builder: (context, downloadProvider, _) {
+        final globalKey = metadata.globalKey;
+        final progress = downloadProvider.getProgress(globalKey);
+        final isQueueing = downloadProvider.isQueueing(globalKey);
+        final isDownloading =
+            progress?.status == DownloadStatus.downloading || progress?.status == DownloadStatus.queued;
+        final isDownloaded = downloadProvider.isDownloaded(globalKey);
+        final isActive = isDownloading || isDownloaded || isQueueing;
+
+        IconData icon = Symbols.download_rounded;
+        Color? activeColor;
+        if (isQueueing || isDownloading) {
+          icon = Symbols.downloading_rounded;
+          activeColor = Theme.of(context).colorScheme.primary;
+        } else if (isDownloaded) {
+          icon = Symbols.download_done_rounded;
+          activeColor = Colors.orange.shade300;
+        }
+
+        return EmbyInfuseUtilityButton(
+          icon: icon,
+          tooltip: t.downloads.downloadNow,
+          onPressed: () => unawaited(_handleDownloadButtonPressed(metadata)),
+          isActive: isActive,
+          activeColor: activeColor,
+          showFocus: showFocus,
+        );
       },
     );
   }

@@ -161,7 +161,6 @@ extension _VideoPlayerBuildMethods on VideoPlayerScreenState {
     // Back handling (sheet-close + player exit) is owned by the OverlaySheetHost
     // that wraps this widget — see video_player_screen.dart (canPop/onSystemBack).
     return Scaffold(
-      // Use transparent background on macOS when native video layer is active
       backgroundColor: Colors.transparent,
       body: GestureDetector(
         behavior: HitTestBehavior.translucent, // Allow taps to pass through to controls
@@ -211,12 +210,22 @@ extension _VideoPlayerBuildMethods on VideoPlayerScreenState {
         child: PlayerChromeInteractionRegion(
           controller: _chromeController,
           hideOnExit: hideChromeOnMouseExit,
-          child: Stack(
-            children: [
-              // macOS PiP placeholder — video is in PiP window, show background with icon
-              // Placed before Video so controls render on top
-              if (Platform.isMacOS) const VideoPlayerMacPipPlaceholder(),
-              Center(
+          child: ValueListenableBuilder<bool>(
+            valueListenable: DesktopPipService.isActive,
+            builder: (context, isDesktopPip, child) {
+              return ClipRRect(
+                borderRadius: isDesktopPip
+                    ? BorderRadius.circular(DesktopPipService.pipCornerRadius)
+                    : BorderRadius.zero,
+                child: child,
+              );
+            },
+            child: Stack(
+              children: [
+                // macOS PiP placeholder — video is in PiP window, show background with icon
+                // Placed before Video so controls render on top
+                if (Platform.isMacOS) const VideoPlayerMacPipPlaceholder(),
+                Center(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final newSize = Size(constraints.maxWidth, constraints.maxHeight);
@@ -351,7 +360,32 @@ extension _VideoPlayerBuildMethods on VideoPlayerScreenState {
               const VideoPlayerWatchTogetherOverlays(),
               // Black overlay during exit (no spinner - just covers transparency)
               VideoPlayerExitOverlay(isExiting: _isExiting),
-            ],
+              // Desktop PiP glass controls on top so transport/scrub work above video surface.
+              if (DesktopPipService.isSupported)
+                Builder(
+                  builder: (context) {
+                    final currentPlayer = player;
+                    if (currentPlayer == null) return const SizedBox.shrink();
+
+                    var canControl = true;
+                    try {
+                      canControl = context.select<WatchTogetherProvider, bool>(
+                        (wt) => wt.isInSession ? wt.canControl() : true,
+                      );
+                    } catch (_) {}
+
+                    return VideoPlayerDesktopPipChrome(
+                      player: currentPlayer,
+                      onExitPip: _togglePIPMode,
+                      onPlayPause: () => unawaited(_playOrPauseWithPlaybackIntent(currentPlayer)),
+                      onSeek: _seekPlayback,
+                      canControl: canControl,
+                      isLive: widget.isLive,
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),

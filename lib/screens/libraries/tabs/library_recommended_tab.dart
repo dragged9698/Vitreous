@@ -14,6 +14,7 @@ import '../../../services/settings_service.dart';
 import '../../../utils/debouncer.dart';
 import '../../../utils/global_key_utils.dart';
 import '../../../utils/layout_constants.dart';
+import '../../../utils/nested_scroll_utils.dart';
 import '../../../utils/platform_detector.dart';
 import '../../../utils/provider_extensions.dart';
 import '../../../utils/watch_state_notifier.dart';
@@ -298,7 +299,7 @@ class _LibraryRecommendedTabState extends BaseLibraryTabState<MediaHub, LibraryR
       // Allow focus decoration to render outside scroll bounds
       clipBehavior: Clip.none,
       slivers: [
-        SliverOverlapInjector(handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context)),
+        ...nestedScrollOverlapSlivers(context),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(0, _focusDecorationPadding, 0, 8),
           sliver: SliverList.builder(

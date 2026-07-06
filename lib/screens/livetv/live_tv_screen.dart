@@ -3,11 +3,11 @@ import '../../media/ids.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../focus/focusable_action_bar.dart';
-import '../../focus/focusable_button.dart';
 import '../../i18n/strings.g.dart';
 import '../../media/live_tv_support.dart';
 import '../../media/media_server_client.dart';
@@ -22,6 +22,9 @@ import '../../utils/app_logger.dart';
 import '../../utils/desktop_window_padding.dart';
 import '../../utils/platform_detector.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/emby_glass_browse_shell.dart';
+import '../../widgets/emby_glass_chrome.dart';
+import '../../widgets/live_tv/emby_live_tv_chrome.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/overlay_sheet.dart';
 import 'reorder_favorites_sheet.dart';
@@ -526,19 +529,73 @@ class _LiveTvScreenState extends State<LiveTvScreen>
     };
   }
 
-  List<Widget> _buildTabChipItems() {
-    return [
-      for (int i = 0; i < _visibleTabs.length; i++) ...[
-        if (i > 0) const SizedBox(width: 8),
-        buildTabChip(
-          _getTabLabel(_visibleTabs[i]),
-          i,
-          onSelectWhenActive: _focusCurrentTab,
-          onNavigateDown: _focusCurrentTab,
-          onNavigateToActions: () => _actionBarKey.currentState?.requestFocusOnFirst(),
-        ),
-      ],
-    ];
+  Widget _buildGlassTabTitle() {
+    return EmbyGlassSegmentedControl(
+      segments: [for (final tab in _visibleTabs) GlassSegment(label: _getTabLabel(tab))],
+      selectedIndex: tabController.index,
+      onSegmentSelected: (index) {
+        tabController.animateTo(index);
+        _focusCurrentTab();
+      },
+    );
+  }
+
+  List<FocusableAction> _toolbarActions(bool isRecordings) => [
+    if (!isRecordings)
+      FocusableAction(
+        icon: _showFavoritesOnly ? Symbols.star_rounded : Symbols.star_outline_rounded,
+        iconFill: _showFavoritesOnly ? 1.0 : 0.0,
+        tooltip: t.liveTv.favorites,
+        onPressed: _toggleFavoritesFilter,
+      ),
+    if (!isRecordings && _showFavoritesOnly && _favoriteChannels.length > 1)
+      FocusableAction(
+        icon: Symbols.swap_vert_rounded,
+        tooltip: t.liveTv.reorderFavorites,
+        onPressed: _showReorderFavorites,
+      ),
+    if (isRecordings)
+      FocusableAction(
+        icon: Symbols.bolt_rounded,
+        tooltip: t.liveTv.processRecordingRules,
+        onPressed: _processRecordingRules,
+      ),
+    FocusableAction(
+      icon: Symbols.refresh_rounded,
+      tooltip: isRecordings ? t.common.refresh : t.liveTv.reloadGuide,
+      onPressed: _onRefresh,
+    ),
+  ];
+
+  List<Widget>? _buildAppBarActions(bool isRecordings) => DesktopAppBarHelper.buildAdjustedActions([
+    FocusableActionBar(
+      key: _actionBarKey,
+      onNavigateLeft: () => getTabChipFocusNode(tabCount - 1).requestFocus(),
+      onNavigateDown: _focusCurrentTab,
+      actions: _toolbarActions(isRecordings),
+    ),
+  ]);
+
+  Widget? _buildToolbarChannelMeta(bool isRecordings) {
+    if (isRecordings || _isLoading || _error != null) return null;
+    final theme = Theme.of(context);
+    return EmbyLiveTvToolbarMeta(
+      icon: Symbols.live_tv_rounded,
+      label: t.liveTv.channelCount(count: _filteredChannels.length),
+      accent: _showFavoritesOnly
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppIcon(Symbols.star_rounded, size: 14, color: theme.colorScheme.primary),
+                const SizedBox(width: 4),
+                Text(
+                  t.liveTv.favorites,
+                  style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary),
+                ),
+              ],
+            )
+          : null,
+    );
   }
 
   @override
@@ -547,44 +604,56 @@ class _LiveTvScreenState extends State<LiveTvScreen>
     final useSideNav = PlatformDetector.shouldUseSideNavigation(context);
 
     final isRecordings = _currentTab == LiveTvTab.recordings;
-    return Scaffold(
-      appBar: AppBar(
-        title: useSideNav ? Row(children: _buildTabChipItems()) : Text(t.liveTv.title),
-        actions: DesktopAppBarHelper.buildAdjustedActions([
-          FocusableActionBar(
-            key: _actionBarKey,
-            onNavigateLeft: () => getTabChipFocusNode(tabCount - 1).requestFocus(),
-            onNavigateDown: _focusCurrentTab,
-            actions: [
-              if (!isRecordings)
-                FocusableAction(
-                  icon: _showFavoritesOnly ? Symbols.star_rounded : Symbols.star_outline_rounded,
-                  iconFill: _showFavoritesOnly ? 1.0 : 0.0,
-                  tooltip: t.liveTv.favorites,
-                  onPressed: _toggleFavoritesFilter,
+    final body = _buildLiveTvBody(theme, useSideNav);
+
+    if (!useSideNav) {
+      return EmbyGlassBrowseShell(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            title: Text(t.liveTv.title),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            actions: _buildAppBarActions(isRecordings),
+          ),
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(child: _buildGlassTabTitle()),
+                    if (_buildToolbarChannelMeta(isRecordings) != null) ...[
+                      const SizedBox(width: 8),
+                      _buildToolbarChannelMeta(isRecordings)!,
+                    ],
+                  ],
                 ),
-              if (!isRecordings && _showFavoritesOnly && _favoriteChannels.length > 1)
-                FocusableAction(
-                  icon: Symbols.swap_vert_rounded,
-                  tooltip: t.liveTv.reorderFavorites,
-                  onPressed: _showReorderFavorites,
-                ),
-              if (isRecordings)
-                FocusableAction(
-                  icon: Symbols.bolt_rounded,
-                  tooltip: t.liveTv.processRecordingRules,
-                  onPressed: _processRecordingRules,
-                ),
-              FocusableAction(
-                icon: Symbols.refresh_rounded,
-                tooltip: isRecordings ? t.common.refresh : t.liveTv.reloadGuide,
-                onPressed: _onRefresh,
               ),
+              Expanded(child: body),
             ],
           ),
-        ]),
+        ),
+      );
+    }
+
+    return EmbyGlassBrowseShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          EmbyGlassPageToolbar(
+            leading: _buildGlassTabTitle(),
+            center: _buildToolbarChannelMeta(isRecordings),
+            actionBarKey: _actionBarKey,
+            onNavigateLeft: () => getTabChipFocusNode(tabCount - 1).requestFocus(),
+            onNavigateDown: _focusCurrentTab,
+            actions: _toolbarActions(isRecordings),
+          ),
+          Expanded(child: body),
+        ],
       ),
-      body: _buildLiveTvBody(theme, useSideNav),
     );
   }
 
@@ -613,51 +682,24 @@ class _LiveTvScreenState extends State<LiveTvScreen>
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: .min,
-          children: [
-            AppIcon(Symbols.error_rounded, size: 48, color: theme.colorScheme.error),
-            const SizedBox(height: 16),
-            Text(_error!, style: theme.textTheme.bodyLarge),
-            const SizedBox(height: 16),
-            FocusableButton(
-              autofocus: true,
-              onPressed: _loadChannels,
-              child: FilledButton.icon(
-                onPressed: _loadChannels,
-                icon: const AppIcon(Symbols.refresh_rounded),
-                label: Text(t.common.retry),
-              ),
-            ),
-          ],
-        ),
+      return EmbyGlassStateCard(
+        icon: Symbols.error_rounded,
+        message: _error!,
+        actionLabel: t.common.retry,
+        onAction: _loadChannels,
       );
     }
     if (_channels.isEmpty && !_visibleTabs.contains(LiveTvTab.recordings)) {
-      return Center(child: Text(t.liveTv.noChannels));
+      return EmbyGlassStateCard(icon: Symbols.live_tv_rounded, message: t.liveTv.noChannels);
     }
 
     final guideChannels = _filteredChannels;
 
-    return Column(
-      children: [
-        if (!useSideNav)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            alignment: .centerLeft,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(children: _buildTabChipItems()),
-            ),
-          ),
-        Expanded(
-          child: TabBarView(
-            controller: tabController,
-            children: [for (final tab in _visibleTabs) _buildTabContent(tab, guideChannels)],
-          ),
-        ),
-      ],
+    final tabView = TabBarView(
+      controller: tabController,
+      children: [for (final tab in _visibleTabs) _buildTabContent(tab, guideChannels)],
     );
+
+    return tabView;
   }
 }

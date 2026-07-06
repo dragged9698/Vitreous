@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../focus/focusable_button.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+
 import '../focus/focusable_text_field.dart';
 import '../focus/input_mode_tracker.dart';
 import '../i18n/strings.g.dart';
 import '../mixins/controller_disposer_mixin.dart';
 import '../widgets/app_icon.dart';
-import '../widgets/dialog_action_button.dart';
+import '../theme/emby_glass_theme.dart';
+import '../widgets/emby_glass_settings.dart';
 import '../widgets/focusable_list_tile.dart';
 import 'focus_utils.dart';
-
-const _buttonPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 14);
-const _buttonShape = StadiumBorder();
 
 /// Shows a dialog on the nearest navigator instead of Flutter's default root
 /// navigator. Use this for profile/session-owned modal routes so they are
@@ -42,29 +41,20 @@ Future<bool> showConfirmDialog(
   final confirmed = await showScopedDialog<bool>(
     context: context,
     builder: (dialogContext) {
-      final colorScheme = Theme.of(dialogContext).colorScheme;
-      return AlertDialog(
-        title: Text(title),
-        content: Text(message),
+      return GlassDialog(
+        title: title,
+        message: message,
+        quality: embyChromeGlassQuality(),
         actions: [
-          FocusableButton(
-            autofocus: true,
+          GlassDialogAction(
+            label: cancelText ?? t.common.cancel,
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              style: TextButton.styleFrom(padding: _buttonPadding, shape: _buttonShape),
-              child: Text(cancelText ?? t.common.cancel),
-            ),
           ),
-          FocusableButton(
+          GlassDialogAction(
+            label: confirmText,
+            isDestructive: isDestructive,
+            isPrimary: !isDestructive,
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              style: isDestructive
-                  ? FilledButton.styleFrom(backgroundColor: colorScheme.error, foregroundColor: colorScheme.onError)
-                  : null,
-              child: Text(confirmText),
-            ),
           ),
         ],
       );
@@ -80,7 +70,14 @@ void showLoadingDialog(BuildContext context) {
   showScopedDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => const Center(child: CircularProgressIndicator()),
+    builder: (ctx) => Center(
+      child: GlassCard(
+        useOwnLayer: true,
+        quality: embyChromeGlassQuality(),
+        padding: const EdgeInsets.all(28),
+        child: const CircularProgressIndicator(),
+      ),
+    ),
   );
 }
 
@@ -89,18 +86,15 @@ Future<void> showServerLimitDialog(BuildContext context) async {
   await showScopedDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
-      title: Text(t.messages.serverLimitTitle),
-      content: Text(t.messages.serverLimitBody),
+    builder: (ctx) => GlassDialog(
+      title: t.messages.serverLimitTitle,
+      message: t.messages.serverLimitBody,
+      quality: embyChromeGlassQuality(),
       actions: [
-        FocusableButton(
-          autofocus: true,
+        GlassDialogAction(
+          label: t.common.close,
+          isPrimary: true,
           onPressed: () => Navigator.of(ctx).pop(),
-          child: FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            style: FilledButton.styleFrom(padding: _buttonPadding, shape: _buttonShape),
-            child: Text(t.common.close),
-          ),
         ),
       ],
     ),
@@ -213,8 +207,10 @@ class _MultilineTextInputDialogState extends State<_MultilineTextInputDialog>
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
+    return GlassDialog(
+      title: widget.title,
+      maxWidth: 400,
+      quality: embyChromeGlassQuality(),
       content: SizedBox(
         width: 400,
         child: FocusableTextField(
@@ -229,17 +225,11 @@ class _MultilineTextInputDialogState extends State<_MultilineTextInputDialog>
         ),
       ),
       actions: [
-        DialogActionButton(
-          focusNode: _cancelFocusNode,
-          onPressed: () => Navigator.pop(context),
-          onNavigateRight: _saveFocusNode.requestFocus,
-          label: t.common.cancel,
-        ),
-        DialogActionButton(
-          onPressed: () => Navigator.pop(context, _controller.text),
+        GlassDialogAction(label: t.common.cancel, onPressed: () => Navigator.pop(context)),
+        GlassDialogAction(
           label: t.common.save,
-          focusNode: _saveFocusNode,
-          onNavigateLeft: _cancelFocusNode.requestFocus,
+          isPrimary: true,
+          onPressed: () => Navigator.pop(context, _controller.text),
         ),
       ],
     );
@@ -287,8 +277,9 @@ class _TextInputDialogState extends State<_TextInputDialog>
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
+    return GlassDialog(
+      title: widget.title,
+      quality: embyChromeGlassQuality(),
       content: FocusableTextField(
         controller: _controller,
         focusNode: _fieldFocusNode,
@@ -301,17 +292,11 @@ class _TextInputDialogState extends State<_TextInputDialog>
         onSubmitted: (_) => _saveFocusNode.requestFocus(),
       ),
       actions: [
-        DialogActionButton(
-          focusNode: _cancelFocusNode,
-          onPressed: () => Navigator.pop(context),
-          onNavigateRight: _saveFocusNode.requestFocus,
-          label: t.common.cancel,
-        ),
-        DialogActionButton(
-          onPressed: _submit,
+        GlassDialogAction(label: t.common.cancel, onPressed: () => Navigator.pop(context)),
+        GlassDialogAction(
           label: widget.confirmText ?? t.common.save,
-          focusNode: _saveFocusNode,
-          onNavigateLeft: _cancelFocusNode.requestFocus,
+          isPrimary: true,
+          onPressed: _submit,
         ),
       ],
     );
@@ -397,59 +382,69 @@ class _OptionPickerDialogState<T> extends State<_OptionPickerDialog<T>> {
       toggle?.onChanged(value);
     }
 
-    return SimpleDialog(
-      title: Text(widget.title),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 24),
-      constraints: const BoxConstraints(minWidth: 304),
-      contentPadding: const EdgeInsets.symmetric(vertical: 8),
-      children: [
-        if (toggle != null)
-          MergeSemantics(
-            child: FocusableListTile(
-              title: Row(
-                children: [
-                  if (toggle.icon != null) ...[
-                    AppIcon(toggle.icon!, fill: 1, size: 24),
-                    const SizedBox(width: rowHorizontalTitleGap),
-                  ],
-                  Expanded(
-                    child: Text(
-                      toggle.label,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+    return GlassDialog(
+      title: widget.title,
+      maxWidth: 360,
+      quality: embyChromeGlassQuality(),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 420),
+        child: SingleChildScrollView(
+          child: EmbyGlassGroupedSection(
+            margin: EdgeInsets.zero,
+            children: [
+              if (toggle != null)
+                MergeSemantics(
+                  child: FocusableListTile(
+                    title: Row(
+                      children: [
+                        if (toggle.icon != null) ...[
+                          AppIcon(toggle.icon!, fill: 1, size: 24),
+                          const SizedBox(width: rowHorizontalTitleGap),
+                        ],
+                        Expanded(
+                          child: Text(
+                            toggle.label,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: rowHorizontalTitleGap),
+                        ExcludeFocus(
+                          child: Switch(value: _toggleValue, onChanged: updateToggle),
+                        ),
+                      ],
                     ),
+                    contentPadding: rowPadding,
+                    onTap: () => updateToggle(!_toggleValue),
                   ),
-                  const SizedBox(width: rowHorizontalTitleGap),
-                  ExcludeFocus(
-                    child: Switch(value: _toggleValue, onChanged: updateToggle),
-                  ),
-                ],
-              ),
-              contentPadding: rowPadding,
-              onTap: () => updateToggle(!_toggleValue),
-            ),
+                ),
+              ...List.generate(widget.options.length, (index) {
+                final option = widget.options[index];
+                final icon = option.icon;
+                return FocusableListTile(
+                  focusNode: index == 0 && widget.focusFirstItem ? _initialFocusNode : null,
+                  leading: icon != null ? AppIcon(icon, fill: 1, size: 24) : null,
+                  title: Text(option.label, style: Theme.of(context).textTheme.bodyLarge),
+                  contentPadding: rowPadding,
+                  horizontalTitleGap: rowHorizontalTitleGap,
+                  minLeadingWidth: rowMinLeadingWidth,
+                  onTap: () async {
+                    if (widget.onBeforeClose != null) {
+                      final result = await widget.onBeforeClose!(option.value);
+                      if (context.mounted) Navigator.pop(context, result);
+                    } else {
+                      Navigator.pop(context, option.value);
+                    }
+                  },
+                );
+              }),
+            ],
           ),
-        ...List.generate(widget.options.length, (index) {
-          final option = widget.options[index];
-          final icon = option.icon;
-          return FocusableListTile(
-            focusNode: index == 0 && widget.focusFirstItem ? _initialFocusNode : null,
-            leading: icon != null ? AppIcon(icon, fill: 1, size: 24) : null,
-            title: Text(option.label, style: Theme.of(context).textTheme.bodyLarge),
-            contentPadding: rowPadding,
-            horizontalTitleGap: rowHorizontalTitleGap,
-            minLeadingWidth: rowMinLeadingWidth,
-            onTap: () async {
-              if (widget.onBeforeClose != null) {
-                final result = await widget.onBeforeClose!(option.value);
-                if (context.mounted) Navigator.pop(context, result);
-              } else {
-                Navigator.pop(context, option.value);
-              }
-            },
-          );
-        }),
+        ),
+      ),
+      actions: [
+        GlassDialogAction(label: t.common.cancel, onPressed: () => Navigator.pop(context)),
       ],
     );
   }

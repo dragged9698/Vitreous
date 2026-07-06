@@ -91,4 +91,39 @@ void main() {
       expect(track.label, const TrackLabel('Audio Track 1'));
     });
   });
+
+  group('sanitizePlaybackMarkers', () {
+    test('drops intro markers that span most of the file', () {
+      const durationMs = 13 * 60 * 1000;
+      final markers = [
+        MediaMarker(id: 1, type: 'intro', startTimeOffset: 0, endTimeOffset: durationMs),
+      ];
+
+      expect(sanitizePlaybackMarkers(markers, durationMs: durationMs), isEmpty);
+    });
+
+    test('drops intro markers longer than five minutes', () {
+      final markers = [
+        MediaMarker(id: 1, type: 'intro', startTimeOffset: 0, endTimeOffset: 6 * 60 * 1000),
+      ];
+
+      expect(sanitizePlaybackMarkers(markers), isEmpty);
+    });
+
+    test('keeps valid intro markers', () {
+      const durationMs = 13 * 60 * 1000;
+      final markers = [
+        MediaMarker(id: 1, type: 'intro', startTimeOffset: 0, endTimeOffset: 90 * 1000),
+      ];
+
+      final sanitized = sanitizePlaybackMarkers(markers, durationMs: durationMs);
+      expect(sanitized, hasLength(1));
+      expect(sanitized.first.endTimeOffset, 90000);
+    });
+
+    test('playbackMarkerSessionKey is stable per marker window', () {
+      final marker = MediaMarker(id: 1, type: 'intro', startTimeOffset: 0, endTimeOffset: 45000);
+      expect(playbackMarkerSessionKey(marker), 'intro:0:45000');
+    });
+  });
 }

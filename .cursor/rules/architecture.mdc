@@ -64,9 +64,9 @@ EmbyConnection (Drift)
 - **SharedPreferences** — settings via `SettingsService` / `BaseSharedPreferencesService`.
 - Bump `schemaVersion` + implement migration for schema changes.
 
-## Legacy Plezy surface
+## Legacy Vitreous surface
 
-Large Plezy/Jellyfin/Plex code paths remain for gradual removal. **New work:**
+Large Vitreous/Jellyfin/Plex code paths remain for gradual removal. **New work:**
 
 - Target Emby API via `emby_core` or `EmbyClient`.
 - Do not extend Jellyfin/Plex-specific mappers unless explicitly asked.

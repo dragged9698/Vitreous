@@ -75,6 +75,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'utils/navigation_transitions.dart';
 import 'utils/log_redaction_manager.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'theme/emby_glass_theme.dart';
+import 'graphics/vitreous_glass_shader.dart';
 
 const bool _enableSentry = bool.fromEnvironment('ENABLE_SENTRY', defaultValue: false);
 const String gitCommit = String.fromEnvironment('GIT_COMMIT');
@@ -125,10 +128,10 @@ Future<void> main() async {
     final packageInfo = await PackageInfo.fromPlatform();
 
     await SentryFlutter.init((options) {
-      options.dsn = 'https://6a1a6ef8c72140099b2798973c1bfb2f@bugs.plezy.app/1';
+      options.dsn = 'https://6a1a6ef8c72140099b2798973c1bfb2f@bugs.vitreous.app/1';
       options.release = gitCommit.isNotEmpty
-          ? 'plezy@${gitCommit.substring(0, 7)}'
-          : 'plezy@${packageInfo.version}+${packageInfo.buildNumber}';
+          ? 'vitreous@${gitCommit.substring(0, 7)}'
+          : 'vitreous@${packageInfo.version}+${packageInfo.buildNumber}';
       if (_sentryEnvironment.isNotEmpty) options.environment = _sentryEnvironment;
       if (_sentryDist.isNotEmpty) options.dist = _sentryDist;
       options.tracesSampleRate = 0;
@@ -214,10 +217,10 @@ Future<void> _bootstrapApp() async {
   final commitSuffix = gitCommit.isNotEmpty ? ' (${gitCommit.substring(0, 7)})' : '';
   String renderer = '';
   if (Platform.isAndroid) {
-    renderer = ' [${await const MethodChannel('com.plezy/theme').invokeMethod<String>('getRenderer')}]';
+    renderer = ' [${await const MethodChannel('com.vitreous/theme').invokeMethod<String>('getRenderer')}]';
   }
   appLogger.i(
-    'Plezy v${packageInfo.version}+${packageInfo.buildNumber}$commitSuffix$renderer'
+    'Vitreous v${packageInfo.version}+${packageInfo.buildNumber}$commitSuffix$renderer'
     ' [effects: ${DevicePerformance.describeSync()}]',
   );
 
@@ -254,7 +257,27 @@ Future<void> _bootstrapApp() async {
     return const ColoredBox(color: Color(0xFF000000));
   };
 
-  runApp(MainApp(settings: settings, storage: storage));
+  await LiquidGlassWidgets.initialize();
+  final glassAdaptiveConfig = await loadEmbyGlassAdaptiveConfig();
+
+  if (VitreousGlassShader.isSupported) {
+    try {
+      await VitreousGlassShader.warmUp();
+    } catch (e, st) {
+      appLogger.w(
+        'VitreousGlassShader warm-up failed — glass chrome falls back to liquid_glass_widgets',
+        error: e,
+        stackTrace: st,
+      );
+    }
+  }
+
+  runApp(
+    embyGlassWrapApp(
+      adaptiveConfig: glassAdaptiveConfig,
+      child: MainApp(settings: settings, storage: storage),
+    ),
+  );
 }
 
 Breadcrumb? _beforeBreadcrumb(Breadcrumb? breadcrumb, Hint _) {
@@ -1341,7 +1364,7 @@ class _SetupScreenState extends State<SetupScreen> with MountedSetStateMixin {
       color: Theme.of(context).scaffoldBackgroundColor,
       child: Stack(
         children: [
-          Center(child: SvgPicture.asset('assets/plezy_adaptive_foreground.svg', width: 288, height: 288)),
+          Center(child: SvgPicture.asset('assets/vitreous_adaptive_foreground.svg', width: 288, height: 288)),
           Positioned(
             left: 0,
             right: 0,

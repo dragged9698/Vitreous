@@ -188,6 +188,17 @@ extension _VideoPlayerPlaybackStartMethods on VideoPlayerScreenState {
 
       // Open video through Player
       if (result.videoUrl != null) {
+        logEmbyPlayback('player-open', {
+          'itemId': _currentMetadata.id,
+          'title': _currentMetadata.title,
+          'backend': _currentMetadata.backend?.name,
+          'playMethod': result.playMethod,
+          'isTranscoding': result.isTranscoding,
+          'qualityPreset': _selectedQualityPreset.name,
+          'qualityIsOriginal': _selectedQualityPreset.isOriginal,
+          'fallbackReason': result.fallbackReason?.name,
+          'resolved': embyResolvedUrlDebugFields(result.videoUrl),
+        });
         // Reset first frame flag and frame rate retry counter for new video
         _hasFirstFrame.value = false;
         _frameRate.resetForNewItem();

@@ -166,7 +166,7 @@ void main() {
           baseUrl: 'https://plex.example',
           token: 'old-token',
           clientIdentifier: 'client-id',
-          product: 'Plezy',
+          product: 'Vitreous',
           version: '1.0.0',
         ),
         serverId: ServerId('server-1'),

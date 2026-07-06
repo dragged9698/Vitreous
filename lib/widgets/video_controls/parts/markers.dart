@@ -1,6 +1,14 @@
 part of '../video_controls.dart';
 
 extension _PlexVideoControlsMarkerMethods on _PlexVideoControlsState {
+  List<MediaMarker> get _effectiveMarkers {
+    final durationMs = widget.player.state.duration.inMilliseconds;
+    return effectivePlaybackMarkers(
+      _rawMarkers,
+      durationMs: durationMs > 0 ? durationMs : null,
+    );
+  }
+
   void _listenToPosition() {
     _positionSubscription = widget.player.streams.position.listen((position) {
       _syncCurrentMarkerForPosition(position);
@@ -11,19 +19,40 @@ extension _PlexVideoControlsMarkerMethods on _PlexVideoControlsState {
     _syncCurrentMarkerForPosition(widget.player.state.position);
   }
 
+  void _markPassedMarkersForPosition(Duration position) {
+    final posMs = position.inMilliseconds;
+    for (final marker in _effectiveMarkers) {
+      if (posMs >= marker.endTimeOffset) {
+        _passedMarkerKeys.add(playbackMarkerSessionKey(marker));
+      }
+    }
+  }
+
+  MediaMarker? _activeMarkerForPosition(Duration position) {
+    _markPassedMarkersForPosition(position);
+
+    final posMs = position.inMilliseconds;
+    for (final marker in _effectiveMarkers) {
+      final key = playbackMarkerSessionKey(marker);
+      if (_passedMarkerKeys.contains(key)) {
+        if (posMs < marker.startTimeOffset) {
+          _passedMarkerKeys.remove(key);
+        } else {
+          continue;
+        }
+      }
+      if (marker.containsPosition(position)) return marker;
+    }
+    return null;
+  }
+
   void _syncCurrentMarkerForPosition(Duration position) {
-    if (!_hasRenderedFirstFrame || _markers.isEmpty || !_markersLoaded) {
+    if (!_hasRenderedFirstFrame || _rawMarkers.isEmpty || !_markersLoaded) {
       _clearCurrentMarker();
       return;
     }
 
-    MediaMarker? foundMarker;
-    for (final marker in _markers) {
-      if (marker.containsPosition(position)) {
-        foundMarker = marker;
-        break;
-      }
-    }
+    final foundMarker = _activeMarkerForPosition(position);
 
     if (foundMarker != _currentMarker && mounted) {
       _updateCurrentMarker(foundMarker);
@@ -93,6 +122,8 @@ extension _PlexVideoControlsMarkerMethods on _PlexVideoControlsState {
     final duration = widget.player.state.duration;
     final isAtEnd = duration > Duration.zero && (duration - endTime).inMilliseconds <= 1000;
 
+    _passedMarkerKeys.add(playbackMarkerSessionKey(marker));
+
     if (marker.isCredits && isAtEnd) {
       if (!skipAutoPlayCountdown && widget.onNext != null) {
         widget.onNext!.call();
@@ -103,6 +134,17 @@ extension _PlexVideoControlsMarkerMethods on _PlexVideoControlsState {
         widget.onReachedEnd?.call(skipAutoPlayCountdown: skipAutoPlayCountdown);
       }
     } else {
+      if (!marker.isCredits &&
+          duration > Duration.zero &&
+          endTime.inMilliseconds >= duration.inMilliseconds - 1000) {
+        if (!mounted) return;
+        _setControlsState(() {
+          _currentMarker = null;
+        });
+        _cancelAutoSkipTimer();
+        _cancelSkipButtonDismissTimer();
+        return;
+      }
       await _seekToPosition(endTime);
     }
 

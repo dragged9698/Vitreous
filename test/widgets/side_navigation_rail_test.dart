@@ -1,9 +1,4 @@
-import 'dart:ui' show PointerDeviceKind;
 import 'package:emby_player/media/ids.dart';
-
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:emby_player/i18n/strings.g.dart';
 import 'package:emby_player/media/media_backend.dart';
 import 'package:emby_player/media/media_kind.dart';
@@ -16,9 +11,11 @@ import 'package:emby_player/services/data_aggregation_service.dart';
 import 'package:emby_player/services/multi_server_manager.dart';
 import 'package:emby_player/services/settings_service.dart';
 import 'package:emby_player/theme/mono_tokens.dart';
-import 'package:emby_player/utils/platform_detector.dart';
-import 'package:emby_player/widgets/app_icon.dart';
+import 'package:emby_player/theme/emby_glass_theme.dart';
+import 'package:emby_player/widgets/emby_infuse_top_bar.dart';
 import 'package:emby_player/widgets/side_navigation_rail.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import '../test_helpers/prefs.dart';
@@ -54,33 +51,11 @@ MediaLibrary _library({
   );
 }
 
-Future<void> _press(WidgetTester tester, LogicalKeyboardKey key) async {
-  await tester.sendKeyEvent(key);
-  await tester.pumpAndSettle();
-}
-
-BoxDecoration? _railItemDecoration(WidgetTester tester, Finder item) {
-  return tester.widget<Container>(find.descendant(of: item, matching: find.byType(Container)).first).decoration
-      as BoxDecoration?;
-}
-
-AnimatedOpacity _railSurfaceOpacity(WidgetTester tester) {
-  return tester
-      .widgetList<AnimatedOpacity>(
-        find.descendant(of: find.byType(SideNavigationRail), matching: find.byType(AnimatedOpacity)),
-      )
-      .singleWhere((widget) => widget.child is ColoredBox);
-}
-
-Future<void> _pumpBasicRail(
+Future<void> _pumpTopBar(
   WidgetTester tester, {
-  GlobalKey<SideNavigationRailState>? sideNavKey,
   NavigationTabId selectedTab = NavigationTabId.discover,
   String? selectedLibraryKey,
   List<MediaLibrary> libraries = const [],
-  bool isSidebarFocused = false,
-  bool alwaysExpanded = false,
-  double? height,
 }) async {
   await SettingsService.getInstance();
 
@@ -99,16 +74,6 @@ Future<void> _pumpBasicRail(
   final multiServerProvider = MultiServerProvider(manager, aggregation);
   addTearDown(multiServerProvider.dispose);
 
-  final rail = SideNavigationRail(
-    key: sideNavKey,
-    selectedTab: selectedTab,
-    selectedLibraryKey: selectedLibraryKey,
-    isSidebarFocused: isSidebarFocused,
-    alwaysExpanded: alwaysExpanded,
-    onDestinationSelected: (_) {},
-    onLibrarySelected: (_) {},
-  );
-
   await tester.pumpWidget(
     TranslationProvider(
       child: MultiProvider(
@@ -117,10 +82,17 @@ Future<void> _pumpBasicRail(
           ChangeNotifierProvider<HiddenLibrariesProvider>.value(value: hiddenLibrariesProvider),
           ChangeNotifierProvider<MultiServerProvider>.value(value: multiServerProvider),
         ],
-        child: MaterialApp(
-          theme: ThemeData(extensions: const [_testTokens]),
-          home: Scaffold(
-            body: height == null ? rail : SizedBox(height: height, child: rail),
+        child: embyGlassWrapApp(
+          child: MaterialApp(
+            theme: ThemeData(extensions: const [_testTokens], brightness: Brightness.dark),
+            home: Scaffold(
+              body: SideNavigationRail(
+                selectedTab: selectedTab,
+                selectedLibraryKey: selectedLibraryKey,
+                onDestinationSelected: (_) {},
+                onLibrarySelected: (_) {},
+              ),
+            ),
           ),
         ),
       ),
@@ -135,331 +107,30 @@ void main() {
   setUp(() {
     resetSharedPreferencesForTest();
     SettingsService.resetForTesting();
-    TvDetectionService.debugSetAppleTVOverride(null);
-    TvDetectionService.setForceTVSync(false);
     LocaleSettings.setLocaleSync(AppLocale.en);
   });
 
-  testWidgets('closed TV rail is slim and keeps primary icons centered', (tester) async {
-    TvDetectionService.debugSetAppleTVOverride(true);
-    addTearDown(() => TvDetectionService.debugSetAppleTVOverride(null));
-    await SettingsService.getInstance();
-
-    final librariesProvider = LibrariesProvider();
-    addTearDown(librariesProvider.dispose);
-
-    final hiddenLibrariesProvider = HiddenLibrariesProvider();
-    await hiddenLibrariesProvider.ensureInitialized();
-    addTearDown(hiddenLibrariesProvider.dispose);
-
-    final manager = MultiServerManager();
-    final aggregation = DataAggregationService(manager);
-    final multiServerProvider = MultiServerProvider(manager, aggregation);
-    addTearDown(multiServerProvider.dispose);
-
-    await tester.pumpWidget(
-      TranslationProvider(
-        child: MultiProvider(
-          providers: [
-            ChangeNotifierProvider<LibrariesProvider>.value(value: librariesProvider),
-            ChangeNotifierProvider<HiddenLibrariesProvider>.value(value: hiddenLibrariesProvider),
-            ChangeNotifierProvider<MultiServerProvider>.value(value: multiServerProvider),
-          ],
-          child: MaterialApp(
-            theme: ThemeData(extensions: const [_testTokens]),
-            home: Scaffold(
-              body: SideNavigationRail(
-                selectedTab: NavigationTabId.discover,
-                isSidebarFocused: false,
-                alwaysExpanded: false,
-                onDestinationSelected: (_) {},
-                onLibrarySelected: (_) {},
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final rail = find.descendant(of: find.byType(SideNavigationRail), matching: find.byType(AnimatedContainer)).first;
-    expect(tester.getSize(rail).width, SideNavigationRailState.tvCollapsedWidth);
-
-    final firstIconCenter = tester.getCenter(find.byType(AppIcon).first).dx;
-    expect(firstIconCenter - tester.getTopLeft(rail).dx, closeTo(SideNavigationRailState.tvCollapsedWidth / 2, 0.1));
-
-    final selectedItem = find.byType(NavigationRailItem).first;
-    final selectedItemContainer = tester.widget<Container>(
-      find.descendant(of: selectedItem, matching: find.byType(Container)).first,
-    );
-    expect((selectedItemContainer.decoration as BoxDecoration?)?.color, isNull);
-
-    expect(_railSurfaceOpacity(tester).opacity, 0.0);
+  testWidgets('renders Infuse-style segmented top navigation', (tester) async {
+    await _pumpTopBar(tester);
+    expect(find.byType(EmbyInfuseSegmentedNav), findsOneWidget);
+    expect(find.byType(SideNavigationRail), findsOneWidget);
   });
 
-  testWidgets('closed non-TV rail keeps an opaque surface', (tester) async {
-    await _pumpBasicRail(tester);
-
-    final rail = find.descendant(of: find.byType(SideNavigationRail), matching: find.byType(AnimatedContainer)).first;
-    expect(tester.getSize(rail).width, SideNavigationRailState.collapsedWidth);
-    expect(_railSurfaceOpacity(tester).opacity, 1.0);
-  });
-
-  testWidgets('expanded TV rail keeps a transparent surface', (tester) async {
-    TvDetectionService.debugSetAppleTVOverride(true);
-    addTearDown(() => TvDetectionService.debugSetAppleTVOverride(null));
-    await SettingsService.getInstance();
-
-    final librariesProvider = LibrariesProvider();
-    addTearDown(librariesProvider.dispose);
-
-    final hiddenLibrariesProvider = HiddenLibrariesProvider();
-    await hiddenLibrariesProvider.ensureInitialized();
-    addTearDown(hiddenLibrariesProvider.dispose);
-
-    final manager = MultiServerManager();
-    final aggregation = DataAggregationService(manager);
-    final multiServerProvider = MultiServerProvider(manager, aggregation);
-    addTearDown(multiServerProvider.dispose);
-
-    await tester.pumpWidget(
-      TranslationProvider(
-        child: MultiProvider(
-          providers: [
-            ChangeNotifierProvider<LibrariesProvider>.value(value: librariesProvider),
-            ChangeNotifierProvider<HiddenLibrariesProvider>.value(value: hiddenLibrariesProvider),
-            ChangeNotifierProvider<MultiServerProvider>.value(value: multiServerProvider),
-          ],
-          child: MaterialApp(
-            theme: ThemeData(extensions: const [_testTokens]),
-            home: Scaffold(
-              body: SideNavigationRail(
-                selectedTab: NavigationTabId.discover,
-                isSidebarFocused: true,
-                alwaysExpanded: false,
-                onDestinationSelected: (_) {},
-                onLibrarySelected: (_) {},
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final rail = find.descendant(of: find.byType(SideNavigationRail), matching: find.byType(AnimatedContainer)).first;
-    expect(tester.getSize(rail).width, SideNavigationRailState.expandedWidth);
-
-    expect(_railSurfaceOpacity(tester).opacity, 0.0);
-  });
-
-  testWidgets('expanded rail keeps selected background outside sidebar keyboard focus', (tester) async {
-    await _pumpBasicRail(tester, alwaysExpanded: true);
-
-    final selectedItem = find.byType(NavigationRailItem).first;
-    expect(_railItemDecoration(tester, selectedItem)?.color, _testTokens.text.withValues(alpha: 0.1));
-  });
-
-  testWidgets('D-pad sidebar focus hides selected item background after focus moves', (tester) async {
-    final sideNavKey = GlobalKey<SideNavigationRailState>();
-    await _pumpBasicRail(tester, sideNavKey: sideNavKey, isSidebarFocused: true, alwaysExpanded: true);
-
-    sideNavKey.currentState!.focusActiveItem();
-    await tester.pumpAndSettle();
-    await _press(tester, LogicalKeyboardKey.arrowDown);
-
-    final selectedItem = find.byType(NavigationRailItem).first;
-    expect(_railItemDecoration(tester, selectedItem)?.color, isNull);
-  });
-
-  testWidgets('focusActiveItem focuses selected library and scrolls it into view', (tester) async {
-    final sideNavKey = GlobalKey<SideNavigationRailState>();
-    final libraries = List.generate(
-      18,
-      (index) => _library(id: '$index', title: 'Library $index', serverId: ServerId('server'), serverName: 'Server'),
-    );
-    final targetLibrary = libraries.last;
-
-    await _pumpBasicRail(
-      tester,
-      sideNavKey: sideNavKey,
-      selectedTab: NavigationTabId.libraries,
-      selectedLibraryKey: targetLibrary.globalKey,
-      libraries: libraries,
-      isSidebarFocused: true,
-      alwaysExpanded: true,
-      height: 260,
-    );
-
-    final scrollable = find.descendant(of: find.byType(SideNavigationRail), matching: find.byType(Scrollable)).first;
-    final scrollableState = tester.state<ScrollableState>(scrollable);
-    expect(scrollableState.position.pixels, 0);
-
-    sideNavKey.currentState!.focusActiveItem();
-    await tester.pump();
-    await tester.pumpAndSettle();
-
-    final targetItemFinder = find.widgetWithText(NavigationRailItem, targetLibrary.title);
-    expect(targetItemFinder, findsOneWidget);
-    final targetItem = tester.widget<NavigationRailItem>(targetItemFinder);
-    expect(targetItem.focusNode.hasFocus, isTrue);
-    expect(scrollableState.position.pixels, greaterThan(0));
-
-    final railRect = tester.getRect(find.byType(SideNavigationRail));
-    final targetRect = tester.getRect(find.text(targetLibrary.title));
-    expect(targetRect.top, greaterThanOrEqualTo(railRect.top));
-    expect(targetRect.bottom, lessThanOrEqualTo(railRect.bottom));
-  });
-
-  testWidgets('reports interaction expansion for shell content push', (tester) async {
-    await SettingsService.getInstance();
-
-    final librariesProvider = LibrariesProvider();
-    addTearDown(librariesProvider.dispose);
-
-    final hiddenLibrariesProvider = HiddenLibrariesProvider();
-    await hiddenLibrariesProvider.ensureInitialized();
-    addTearDown(hiddenLibrariesProvider.dispose);
-
-    final manager = MultiServerManager();
-    final aggregation = DataAggregationService(manager);
-    final multiServerProvider = MultiServerProvider(manager, aggregation);
-    addTearDown(multiServerProvider.dispose);
-
-    final reports = <bool>[];
-
-    await tester.pumpWidget(
-      TranslationProvider(
-        child: MultiProvider(
-          providers: [
-            ChangeNotifierProvider<LibrariesProvider>.value(value: librariesProvider),
-            ChangeNotifierProvider<HiddenLibrariesProvider>.value(value: hiddenLibrariesProvider),
-            ChangeNotifierProvider<MultiServerProvider>.value(value: multiServerProvider),
-          ],
-          child: MaterialApp(
-            theme: ThemeData(extensions: const [_testTokens]),
-            home: Scaffold(
-              body: SideNavigationRail(
-                selectedTab: NavigationTabId.discover,
-                isSidebarFocused: false,
-                alwaysExpanded: false,
-                onInteractionExpandedChanged: reports.add,
-                onDestinationSelected: (_) {},
-                onLibrarySelected: (_) {},
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final rail = find.descendant(of: find.byType(SideNavigationRail), matching: find.byType(AnimatedContainer)).first;
-    expect(tester.getSize(rail).width, SideNavigationRailState.collapsedWidth);
-
-    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    addTearDown(gesture.removePointer);
-    await gesture.addPointer(location: const Offset(799, 599));
-    await tester.pump();
-    await gesture.moveTo(tester.getCenter(rail));
-    await tester.pumpAndSettle();
-
-    expect(reports.last, isTrue);
-    expect(tester.getSize(rail).width, SideNavigationRailState.expandedWidth);
-
-    await gesture.moveTo(tester.getBottomRight(rail) + const Offset(100, -10));
-    await tester.pump(const Duration(milliseconds: 200));
-
-    expect(reports.last, isFalse);
-  });
-
-  testWidgets('Apple TV D-pad focus skips hidden downloads item', (tester) async {
-    TvDetectionService.debugSetAppleTVOverride(true);
-    addTearDown(() => TvDetectionService.debugSetAppleTVOverride(null));
-    await SettingsService.getInstance();
-
-    final librariesProvider = LibrariesProvider();
-    addTearDown(librariesProvider.dispose);
-
-    final hiddenLibrariesProvider = HiddenLibrariesProvider();
-    await hiddenLibrariesProvider.ensureInitialized();
-    addTearDown(hiddenLibrariesProvider.dispose);
-
-    final manager = MultiServerManager();
-    final aggregation = DataAggregationService(manager);
-    final multiServerProvider = MultiServerProvider(manager, aggregation);
-    addTearDown(multiServerProvider.dispose);
+  testWidgets('selecting Libraries reveals the library sub-bar', (tester) async {
+    final libraries = [
+      _library(id: '1', title: 'Movies', serverId: ServerId('server'), serverName: 'Server'),
+      _library(id: '2', title: 'Shows', serverId: ServerId('server'), serverName: 'Server'),
+    ];
 
     final sideNavKey = GlobalKey<SideNavigationRailState>();
-    NavigationTabId? selectedTab;
-
-    await tester.pumpWidget(
-      TranslationProvider(
-        child: MultiProvider(
-          providers: [
-            ChangeNotifierProvider<LibrariesProvider>.value(value: librariesProvider),
-            ChangeNotifierProvider<HiddenLibrariesProvider>.value(value: hiddenLibrariesProvider),
-            ChangeNotifierProvider<MultiServerProvider>.value(value: multiServerProvider),
-          ],
-          child: MaterialApp(
-            theme: ThemeData(extensions: const [_testTokens]),
-            home: Scaffold(
-              body: SideNavigationRail(
-                key: sideNavKey,
-                selectedTab: NavigationTabId.discover,
-                isSidebarFocused: true,
-                alwaysExpanded: true,
-                onDestinationSelected: (tab) => selectedTab = tab,
-                onLibrarySelected: (_) {},
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    sideNavKey.currentState!.focusActiveItem();
-    await tester.pumpAndSettle();
-
-    // Home -> Libraries -> Search -> Settings. Downloads is hidden on Apple TV.
-    await _press(tester, LogicalKeyboardKey.arrowDown);
-    await _press(tester, LogicalKeyboardKey.arrowDown);
-    await _press(tester, LogicalKeyboardKey.arrowDown);
-    await _press(tester, LogicalKeyboardKey.enter);
-
-    expect(selectedTab, NavigationTabId.settings);
-  });
-
-  testWidgets('D-pad down from a hidden server header focuses that hidden server library', (tester) async {
     await SettingsService.getInstance();
 
-    final visibleServerALibrary = _library(
-      id: '1',
-      title: 'Visible Server A',
-      serverId: ServerId('server-a'),
-      serverName: 'Server A',
-    );
-    final hiddenServerALibrary = _library(
-      id: '2',
-      title: 'Hidden Server A',
-      serverId: ServerId('server-a'),
-      serverName: 'Server A',
-    );
-    final visibleServerBLibrary = _library(
-      id: '1',
-      title: 'Visible Server B',
-      serverId: ServerId('server-b'),
-      serverName: 'Server B',
-    );
-
     final librariesProvider = LibrariesProvider();
-    await librariesProvider.updateLibraryOrder([visibleServerALibrary, hiddenServerALibrary, visibleServerBLibrary]);
+    await librariesProvider.updateLibraryOrder(libraries);
     addTearDown(librariesProvider.dispose);
 
     final hiddenLibrariesProvider = HiddenLibrariesProvider();
     await hiddenLibrariesProvider.ensureInitialized();
-    await hiddenLibrariesProvider.hideLibrary(hiddenServerALibrary.globalKey);
     addTearDown(hiddenLibrariesProvider.dispose);
 
     final manager = MultiServerManager();
@@ -467,9 +138,7 @@ void main() {
     final multiServerProvider = MultiServerProvider(manager, aggregation);
     addTearDown(multiServerProvider.dispose);
 
-    final sideNavKey = GlobalKey<SideNavigationRailState>();
-    var selectedLibraryKey = '';
-
+    NavigationTabId? selected = NavigationTabId.discover;
     await tester.pumpWidget(
       TranslationProvider(
         child: MultiProvider(
@@ -478,16 +147,16 @@ void main() {
             ChangeNotifierProvider<HiddenLibrariesProvider>.value(value: hiddenLibrariesProvider),
             ChangeNotifierProvider<MultiServerProvider>.value(value: multiServerProvider),
           ],
-          child: MaterialApp(
-            theme: ThemeData(extensions: const [_testTokens]),
-            home: Scaffold(
-              body: SideNavigationRail(
-                key: sideNavKey,
-                selectedTab: NavigationTabId.discover,
-                isSidebarFocused: true,
-                alwaysExpanded: true,
-                onDestinationSelected: (_) {},
-                onLibrarySelected: (key) => selectedLibraryKey = key,
+          child: embyGlassWrapApp(
+            child: MaterialApp(
+              theme: ThemeData(extensions: const [_testTokens], brightness: Brightness.dark),
+              home: Scaffold(
+                body: SideNavigationRail(
+                  key: sideNavKey,
+                  selectedTab: selected!,
+                  onDestinationSelected: (tab) => selected = tab,
+                  onLibrarySelected: (_) {},
+                ),
               ),
             ),
           ),
@@ -496,20 +165,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    sideNavKey.currentState!.focusActiveItem();
+    sideNavKey.currentState!.debugOpenLibrariesMenu();
     await tester.pumpAndSettle();
 
-    // Home -> Libraries -> Server A header -> visible A -> Server B header -> visible B -> Hidden Libraries.
-    for (var i = 0; i < 6; i++) {
-      await _press(tester, LogicalKeyboardKey.arrowDown);
-    }
-    await _press(tester, LogicalKeyboardKey.enter);
+    expect(find.byType(EmbyInfuseLibraryNav), findsOneWidget);
+  });
 
-    // Hidden Libraries -> hidden Server A header -> hidden Server A library.
-    await _press(tester, LogicalKeyboardKey.arrowDown);
-    await _press(tester, LogicalKeyboardKey.arrowDown);
-    await _press(tester, LogicalKeyboardKey.enter);
+  testWidgets('top bar is aligned to the top center of the screen', (tester) async {
+    await _pumpTopBar(tester);
 
-    expect(selectedLibraryKey, hiddenServerALibrary.globalKey);
+    final align = tester.widget<Align>(
+      find.descendant(of: find.byType(SideNavigationRail), matching: find.byType(Align)).first,
+    );
+    expect(align.alignment, Alignment.topCenter);
   });
 }

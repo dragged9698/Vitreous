@@ -6,6 +6,7 @@ import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../../focus/focus_theme.dart';
 import '../../focus/focusable_action_bar.dart';
 import '../../focus/dpad_navigator.dart';
@@ -27,6 +28,9 @@ import '../../utils/app_logger.dart';
 import '../../utils/dialogs.dart';
 import '../../utils/library_grouping.dart';
 import '../../utils/platform_detector.dart';
+import '../../theme/emby_glass_theme.dart';
+import '../../widgets/emby_glass_browse_shell.dart';
+import '../../widgets/emby_glass_chrome.dart';
 import '../../utils/provider_extensions.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/content_utils.dart';
@@ -903,28 +907,30 @@ class _LibrariesScreenState extends State<LibrariesScreen>
     List<MediaLibrary> visibleLibraries,
     MediaLibrary? selectedLibrary, {
     required bool groupByServer,
+    required int selectedTabIndex,
   }) {
     // No selection at all, or visible list is empty AND we're not browsing a hidden library
     if (_selectedLibraryGlobalKey == null || (visibleLibraries.isEmpty && selectedLibrary == null)) {
       return Text(t.libraries.title);
     }
 
-    // On desktop/TV with side nav, show tabs in app bar (library name is in side nav)
+    // On desktop/TV with side nav, show glass in-page tabs (library name is in side nav).
     if (PlatformDetector.shouldUseSideNavigation(context)) {
-      return Row(
-        mainAxisSize: .min,
-        children: [
-          for (int i = 0; i < _visibleTabs.length; i++) ...[
-            if (i > 0) const SizedBox(width: 8),
-            buildTabChip(
-              _getTabLabel(_visibleTabs[i]),
-              i,
-              onSelectWhenActive: _focusCurrentTab,
-              onNavigateDown: _focusCurrentTabFromTabBar,
-              onNavigateToActions: () => _actionBarKey.currentState?.requestFocusOnFirst(),
-            ),
-          ],
-        ],
+      if (_visibleTabs.isEmpty) {
+        return Text(t.libraries.title);
+      }
+      final index = selectedTabIndex.clamp(0, _visibleTabs.length - 1);
+      return GlassSegmentedControl(
+        segments: [for (final tab in _visibleTabs) GlassSegment(label: _getTabLabel(tab))],
+        selectedIndex: index,
+        quality: embyChromeGlassQuality(),
+        onSegmentSelected: (segmentIndex) {
+          if (segmentIndex == tabController.index) {
+            _focusCurrentTab();
+            return;
+          }
+          tabController.animateTo(segmentIndex);
+        },
       );
     }
 
@@ -1036,14 +1042,21 @@ class _LibrariesScreenState extends State<LibrariesScreen>
     ];
 
     Widget appBar({required bool floating}) => DesktopSliverAppBar(
-      title: _buildAppBarTitle(visibleLibraries, selectedLibrary, groupByServer: groupByServerSetting),
+      title: _buildAppBarTitle(
+        visibleLibraries,
+        selectedLibrary,
+        groupByServer: groupByServerSetting,
+        selectedTabIndex: currentTabIndex,
+      ),
       // When showing the tab content, let the app bar float away with the
       // content. Otherwise (loading / empty / error states) keep it pinned so
       // it stays visible over the centered state widget.
       pinned: !floating,
       floating: floating,
       snap: floating,
-      backgroundColor: useTvRecommendedBackdrop ? Colors.transparent : Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: (useTvRecommendedBackdrop || useSideNavigation)
+          ? Colors.transparent
+          : Theme.of(context).scaffoldBackgroundColor,
       surfaceTintColor: Colors.transparent,
       shadowColor: Colors.transparent,
       scrolledUnderElevation: 0,
@@ -1077,7 +1090,12 @@ class _LibrariesScreenState extends State<LibrariesScreen>
           shadowColor: Colors.transparent,
           elevation: 0,
           scrolledUnderElevation: 0,
-          title: _buildAppBarTitle(visibleLibraries, selectedLibrary, groupByServer: groupByServerSetting),
+          title: _buildAppBarTitle(
+        visibleLibraries,
+        selectedLibrary,
+        groupByServer: groupByServerSetting,
+        selectedTabIndex: currentTabIndex,
+      ),
           actions: [
             FocusableActionBar(
               key: _actionBarKey,
@@ -1161,6 +1179,30 @@ class _LibrariesScreenState extends State<LibrariesScreen>
             ],
           ),
         );
+      } else if (useSideNavigation) {
+        body = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            EmbyGlassPageToolbar(
+              leading: EmbyGlassSegmentedControl(
+                segments: [for (final tab in _visibleTabs) GlassSegment(label: _getTabLabel(tab))],
+                selectedIndex: currentTabIndex,
+                onSegmentSelected: (index) {
+                  if (index == tabController.index) {
+                    _focusCurrentTab();
+                    return;
+                  }
+                  tabController.animateTo(index);
+                },
+              ),
+              actionBarKey: _actionBarKey,
+              onNavigateLeft: () => getTabChipFocusNode(_visibleTabs.length - 1).requestFocus(),
+              onNavigateDown: _focusCurrentTab,
+              actions: appBarActions(),
+            ),
+            Expanded(child: buildTabs()),
+          ],
+        );
       } else {
         body = NestedScrollView(
           controller: _outerScrollController,
@@ -1172,25 +1214,18 @@ class _LibrariesScreenState extends State<LibrariesScreen>
             ),
             if (showMobileTabsRow)
               SliverToBoxAdapter(
-                child: Container(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (int i = 0; i < _visibleTabs.length; i++) ...[
-                          if (i > 0) const SizedBox(width: 8),
-                          buildTabChip(
-                            _getTabLabel(_visibleTabs[i]),
-                            i,
-                            onSelectWhenActive: _focusCurrentTab,
-                            onNavigateDown: _focusCurrentTabFromTabBar,
-                            onNavigateToActions: () => _actionBarKey.currentState?.requestFocusOnFirst(),
-                          ),
-                        ],
-                      ],
-                    ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: GlassSegmentedControl(
+                    segments: [for (final tab in _visibleTabs) GlassSegment(label: _getTabLabel(tab))],
+                    selectedIndex: currentTabIndex,
+                    onSegmentSelected: (index) {
+                      if (index == tabController.index) {
+                        _focusCurrentTab();
+                        return;
+                      }
+                      tabController.animateTo(index);
+                    },
                   ),
                 ),
               ),
@@ -1207,7 +1242,14 @@ class _LibrariesScreenState extends State<LibrariesScreen>
       child: body,
     );
 
-    return Scaffold(body: scrollBody);
+    return EmbyGlassBrowseShell(
+      child: Scaffold(
+        backgroundColor: (useTvRecommendedBackdrop || useSideNavigation)
+            ? Colors.transparent
+            : Theme.of(context).scaffoldBackgroundColor,
+        body: scrollBody,
+      ),
+    );
   }
 }
 

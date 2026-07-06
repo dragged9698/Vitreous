@@ -65,6 +65,7 @@ import 'emby_media_info_mapper.dart';
 import 'emby_playback_bundle.dart';
 import 'emby_playback_urls.dart';
 import 'emby_playback_policy.dart';
+import 'emby_playback_debug.dart';
 import 'emby_trickplay_service.dart';
 import 'playback_initialization_types.dart';
 import 'scrub_preview_source.dart';
@@ -131,7 +132,7 @@ class EmbyClient
     }
     final deviceName = await DeviceNameService.resolve();
     final authHeader = buildEmbyAuthHeader(
-      clientName: 'Plezy',
+      clientName: 'Vitreous',
       clientVersion: version,
       deviceName: deviceName,
       deviceId: connection.deviceId,

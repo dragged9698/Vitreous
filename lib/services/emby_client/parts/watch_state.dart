@@ -36,15 +36,15 @@ mixin _EmbyWatchStateMethods on MediaServerCacheMixin {
 
   @override
   Future<void> rate(MediaItem item, double rating) async {
+    // Emby routes ratings under /Users/{userId}/Items/{itemId}/Rating with a
+    // JSON body — not Jellyfin's /UserItems/{id}/Rating query-param form.
     // Lossy mapping — Emby only stores a binary like/dislike. Treat
     // a negative input as "clear the rating" (DELETE), >= 6/10 as a like
     // (POST Likes=true), and the rest as a dislike (POST Likes=false).
+    final path = '/Users/${_segment(connection.userId)}/Items/${_segment(item.id)}/Rating';
     final response = rating < 0
-        ? await _http.delete('/UserItems/${_segment(item.id)}/Rating', queryParameters: {'userId': connection.userId})
-        : await _http.post(
-            '/UserItems/${_segment(item.id)}/Rating',
-            queryParameters: {'userId': connection.userId, 'Likes': (rating >= 6.0).toString()},
-          );
+        ? await _http.delete(path)
+        : await _http.post(path, body: {'Likes': rating >= 6.0});
     throwIfHttpError(response);
   }
 }

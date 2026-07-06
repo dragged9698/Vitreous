@@ -131,7 +131,7 @@ class JellyfinClient
     }
     final deviceName = await DeviceNameService.resolve();
     final authHeader = buildJellyfinAuthHeader(
-      clientName: 'Plezy',
+      clientName: 'Vitreous',
       clientVersion: version,
       deviceName: deviceName,
       deviceId: connection.deviceId,

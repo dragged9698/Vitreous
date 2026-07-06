@@ -7,7 +7,7 @@ extension _PlexVideoControlsVisibilityMethods on _PlexVideoControlsState {
     widget.chromeController.setHasFirstFrame(hasFrame);
     if (hasFrame) {
       // Retry with network-first if initial cache-first returned empty
-      if (_chapters.isEmpty && _markers.isEmpty) {
+      if (_chapters.isEmpty && _rawMarkers.isEmpty) {
         _loadPlaybackExtras(forceRefresh: true);
       }
       _syncCurrentMarkerForCurrentPosition();
@@ -38,8 +38,8 @@ extension _PlexVideoControlsVisibilityMethods on _PlexVideoControlsState {
     if (!PlatformDetector.isDesktopOS()) return;
     final mode = _settings.read(SettingsService.alwaysOnTopMode);
     if (mode == AlwaysOnTopMode.off) return;
-    if (mode == AlwaysOnTopMode.on && !isPlaying) return;
 
+    appLogger.d('[AlwaysOnTop] applyForPlayback mode=$mode isPlaying=$isPlaying');
     await DesktopPipService.applyMode(mode, isPlaying: isPlaying);
     if (!mounted) return;
     final isOnTop = Platform.isLinux
@@ -226,6 +226,7 @@ extension _PlexVideoControlsVisibilityMethods on _PlexVideoControlsState {
     if (!PlatformDetector.isDesktopOS()) return;
 
     final newValue = !_isAlwaysOnTop;
+    appLogger.i('[AlwaysOnTop] toggle request newValue=$newValue');
     if (Platform.isLinux) {
       await LinuxWindowService.setKeepAbove(newValue);
     } else {
@@ -236,6 +237,7 @@ extension _PlexVideoControlsVisibilityMethods on _PlexVideoControlsState {
     _setControlsState(() {
       _isAlwaysOnTop = newValue;
     });
+    appLogger.i('[AlwaysOnTop] toggle applied newValue=$newValue');
   }
 
   /// Show controls and optionally focus play/pause on keyboard input (desktop only)

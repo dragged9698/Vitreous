@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:emby_player/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../focus/focusable_button.dart';
 import '../../focus/input_mode_tracker.dart';
+import '../../media/library_filter_result.dart';
 import '../../media/media_filter.dart';
 import '../../utils/scroll_utils.dart';
 import '../../widgets/bottom_sheet_page_scaffold.dart';
@@ -11,6 +14,7 @@ import '../../widgets/overlay_sheet.dart';
 import '../../i18n/strings.g.dart';
 
 typedef FilterValuesLoader = Future<List<MediaFilterValue>> Function(MediaFilter filter);
+typedef FiltersCatalogLoader = Future<LibraryFilterResult> Function();
 
 class FiltersBottomSheet extends StatefulWidget {
   final List<MediaFilter> filters;
@@ -27,6 +31,15 @@ class FiltersBottomSheet extends StatefulWidget {
   /// lists the categories.
   final Map<String, List<MediaFilterValue>>? cachedValues;
 
+  /// Emby/Jellyfin libraries bootstrap with only the unwatched toggle before
+  /// `/Items/Filters` (or Emby's `/Genres` fallback) returns. When supplied the
+  /// sheet fetches the full catalog on open instead of trusting [filters].
+  final FiltersCatalogLoader? resolveFilters;
+
+  /// Called after [resolveFilters] succeeds so the browse tab can cache the
+  /// catalog for the next open.
+  final void Function(LibraryFilterResult result)? onFiltersCatalogLoaded;
+
   const FiltersBottomSheet({
     super.key,
     required this.filters,
@@ -37,6 +50,8 @@ class FiltersBottomSheet extends StatefulWidget {
     required this.loadFilterValues,
     this.onBack,
     this.cachedValues,
+    this.resolveFilters,
+    this.onFiltersCatalogLoaded,
   });
 
   @override
@@ -49,6 +64,9 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
   MediaFilter? _currentFilter;
   List<MediaFilterValue> _filterValues = [];
   bool _isLoadingValues = false;
+  bool _isLoadingFilters = false;
+  List<MediaFilter>? _resolvedFilters;
+  Map<String, List<MediaFilterValue>>? _resolvedCachedValues;
   final Map<String, String> _tempSelectedFilters = {};
   static final Map<String, String> _filterDisplayNames = {}; // Cache for display names
   static const int _maxCachedDisplayNames = 1000;
@@ -59,12 +77,42 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
 
   String _cacheKey(String filter, String value) => '${widget.serverId}:${widget.libraryKey}:$filter:$value';
 
+  List<MediaFilter> get _activeFilters => _resolvedFilters ?? widget.filters;
+
+  Map<String, List<MediaFilterValue>>? get _activeCachedValues => _resolvedCachedValues ?? widget.cachedValues;
+
+  bool get _needsFilterResolve =>
+      widget.resolveFilters != null && _activeFilters.every((filter) => filter.filterType == 'boolean');
+
   @override
   void initState() {
     super.initState();
     _tempSelectedFilters.addAll(widget.selectedFilters);
     _sortFilters();
     _initialFocusNode = FocusNode(debugLabel: 'FiltersBottomSheetInitialFocus');
+    if (_needsFilterResolve) {
+      _isLoadingFilters = true;
+      unawaited(_resolveFilters());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant FiltersBottomSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filters != widget.filters && _resolvedFilters == null) {
+      _sortFilters();
+    }
+    if (_currentFilter != null &&
+        oldWidget.cachedValues != widget.cachedValues &&
+        widget.cachedValues?.containsKey(_currentFilter!.filter) == true) {
+      final cached = widget.cachedValues![_currentFilter!.filter]!;
+      if (cached.isNotEmpty) {
+        setState(() {
+          _filterValues = cached;
+          _isLoadingValues = false;
+        });
+      }
+    }
   }
 
   @override
@@ -76,11 +124,32 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
 
   void _sortFilters() {
     // Separate boolean filters (toggles) from regular filters
-    final booleanFilters = widget.filters.where((f) => f.filterType == 'boolean').toList();
-    final regularFilters = widget.filters.where((f) => f.filterType != 'boolean').toList();
+    final booleanFilters = _activeFilters.where((f) => f.filterType == 'boolean').toList();
+    final regularFilters = _activeFilters.where((f) => f.filterType != 'boolean').toList();
 
     // Combine with boolean filters first
     _sortedFilters = [...booleanFilters, ...regularFilters];
+  }
+
+  Future<void> _resolveFilters() async {
+    final loader = widget.resolveFilters;
+    if (loader == null) return;
+    try {
+      final result = await loader();
+      if (!mounted) return;
+      setState(() {
+        _resolvedFilters = result.filters;
+        _resolvedCachedValues = result.cachedValues;
+        _isLoadingFilters = false;
+      });
+      widget.onFiltersCatalogLoaded?.call(result);
+      _sortFilters();
+      _requestInitialFocus();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingFilters = false);
+      _requestInitialFocus();
+    }
   }
 
   bool _isBooleanFilter(MediaFilter filter) {
@@ -95,7 +164,7 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
 
     try {
       // Cached path (Jellyfin) - `/Items/Filters` returned values inline.
-      final cached = widget.cachedValues?[filter.filter];
+      final cached = _activeCachedValues?[filter.filter];
       final values = cached ?? await widget.loadFilterValues(filter);
       if (!mounted) return;
       setState(() {
@@ -249,6 +318,13 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
   }
 
   Widget _buildFiltersView() {
+    if (_isLoadingFilters) {
+      return Focus(
+        autofocus: InputModeTracker.isKeyboardMode(context),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final autofocusFirst = InputModeTracker.isKeyboardMode(context);
     return ListView.builder(
       primary: false,

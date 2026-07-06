@@ -48,9 +48,9 @@ body:
       required: true
 
   - type: input
-    id: plezy-version
+    id: vitreous-version
     attributes:
-      label: Plezy Version
+      label: Vitreous Version
       description: Check the app settings for the version number and paste it here
       placeholder: e.g., 1.7.0
     validations:

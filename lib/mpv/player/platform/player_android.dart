@@ -8,8 +8,8 @@ import '../player_base.dart';
 
 /// Android implementation using ExoPlayer with ASS subtitle support via libass-android.
 class PlayerAndroid extends PlayerBase {
-  static const _methodChannel = MethodChannel('com.plezy/exo_player');
-  static const _eventChannel = EventChannel('com.plezy/exo_player/events');
+  static const _methodChannel = MethodChannel('com.vitreous/exo_player');
+  static const _eventChannel = EventChannel('com.vitreous/exo_player/events');
 
   int? _bufferSizeBytes;
   bool _tunnelingEnabled = true;

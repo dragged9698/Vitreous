@@ -23,7 +23,7 @@ Comments explain **why** and **invariants** — not narration. Match the dense v
 
 ```
 // TODO(emby): <action> — <reason>
-// Plezy-legacy: <note> — when touching code pending Emby-only simplification
+// Vitreous-legacy: <note> — when touching code pending Emby-only simplification
 ```
 
 ## Public APIs

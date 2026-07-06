@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../focus/dpad_navigator.dart';
 import '../focus/input_mode_tracker.dart';
 import '../focus/key_event_utils.dart';
+import '../theme/emby_glass_theme.dart';
 import '../utils/platform_detector.dart';
+import 'emby_glass_sheet.dart';
 
 /// Entry in the sheet page stack.
 class _OverlaySheetEntry {
@@ -133,13 +136,21 @@ class OverlaySheetController {
             maxHeight: isDesktop ? 400 : size.height * 0.75,
           );
         }();
-    return showModalBottomSheet<T>(
+    return GlassSheet.show<T>(
       context: context,
-      builder: builder,
-      constraints: effectiveConstraints,
-      backgroundColor: backgroundColor ?? Theme.of(context).colorScheme.surface,
+      quality: embyChromeGlassQuality(),
+      settings: embyChromeGlassSettings(context),
+      isScrollable: isScrollControlled,
+      isDismissible: barrierDismissible,
       barrierColor: Colors.black54,
-      isScrollControlled: isScrollControlled,
+      topBorderRadius: alignment == Alignment.topCenter ? 24 : 32,
+      builder: (sheetContext) {
+        final content = builder(sheetContext);
+        return ConstrainedBox(
+          constraints: effectiveConstraints,
+          child: content,
+        );
+      },
     );
   }
 
@@ -575,8 +586,8 @@ class _OverlaySheetHostState extends State<OverlaySheetHost> with SingleTickerPr
     final slideDirection = isTop ? -1.0 : 1.0;
     final slideDistance = size.height;
     final borderRadius = isTop
-        ? const BorderRadius.vertical(bottom: Radius.circular(16))
-        : const BorderRadius.vertical(top: Radius.circular(16));
+        ? const BorderRadius.vertical(bottom: Radius.circular(24))
+        : const BorderRadius.vertical(top: Radius.circular(24));
 
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -671,19 +682,30 @@ class _OverlaySheetHostState extends State<OverlaySheetHost> with SingleTickerPr
                 right: true,
                 top: false,
                 bottom: false,
-                child: Material(
-                  key: _sheetKey,
-                  color: _explicitBackgroundColor ?? colorScheme.surface,
-                  borderRadius: borderRadius,
-                  clipBehavior: Clip.antiAlias,
-                  child: SafeArea(
-                    top: isTop,
-                    bottom: !isTop,
-                    left: false,
-                    right: false,
-                    child: ConstrainedBox(constraints: effectiveConstraints, child: sheetContent),
-                  ),
-                ),
+                child: _explicitBackgroundColor == null
+                    ? EmbyGlassSheetChrome(
+                        borderRadius: borderRadius,
+                        child: SafeArea(
+                          top: isTop,
+                          bottom: !isTop,
+                          left: false,
+                          right: false,
+                          child: ConstrainedBox(constraints: effectiveConstraints, child: sheetContent),
+                        ),
+                      )
+                    : Material(
+                        key: _sheetKey,
+                        color: _explicitBackgroundColor,
+                        borderRadius: borderRadius,
+                        clipBehavior: Clip.antiAlias,
+                        child: SafeArea(
+                          top: isTop,
+                          bottom: !isTop,
+                          left: false,
+                          right: false,
+                          child: ConstrainedBox(constraints: effectiveConstraints, child: sheetContent),
+                        ),
+                      ),
               ),
             ),
           ),

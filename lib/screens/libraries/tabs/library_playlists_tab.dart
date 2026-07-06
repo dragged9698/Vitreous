@@ -10,6 +10,7 @@ import '../../../utils/grid_size_calculator.dart';
 import '../../../utils/layout_constants.dart';
 import '../../../utils/library_refresh_notifier.dart';
 import '../../../utils/media_server_http_client.dart';
+import '../../../utils/nested_scroll_utils.dart';
 import '../../../utils/platform_detector.dart';
 import '../../../widgets/focusable_media_card.dart';
 import '../../../widgets/media_grid_delegate.dart';
@@ -119,7 +120,7 @@ class _LibraryPlaylistsTabState extends BaseLibraryTabState<MediaPlaylist, Libra
         return CustomScrollView(
           clipBehavior: Clip.none,
           slivers: [
-            SliverOverlapInjector(handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context)),
+            ...nestedScrollOverlapSlivers(context),
             if (viewMode == ViewMode.list)
               _buildListSliver(density)
             else

@@ -521,4 +521,23 @@ extension _VideoPlayerPlaybackServiceMethods on VideoPlayerScreenState {
     _rearmCompletionLatch();
     unawaited(_seekPlayback(pos));
   }
+
+  Future<void> _closePreviousEmbyStreamIfNeeded({
+    required MediaItem metadata,
+    String? playSessionId,
+  }) async {
+    if (playSessionId == null || playSessionId.isEmpty) return;
+    if (metadata.backend != MediaBackend.emby) return;
+    final mediaClient = _playbackContext?.reportingClient ?? _getOnlineMediaServerClient(context);
+    if (mediaClient is! EmbyClient) return;
+    try {
+      await mediaClient.closeActivePlaybackStream(
+        itemId: metadata.id,
+        playSessionId: playSessionId,
+        mediaSourceId: _currentMediaInfo?.mediaSourceId,
+      );
+    } catch (e) {
+      appLogger.d('Failed to close previous Emby stream before reload (non-fatal)', error: e);
+    }
+  }
 }

@@ -205,7 +205,7 @@ class EmbyConnection extends Connection {
   }
 }
 
-/// A single-server Jellyfin connection (Plezy-native API paths).
+/// A single-server Jellyfin connection (Vitreous-native API paths).
 class JellyfinConnection extends Connection {
   @override
   final String id;

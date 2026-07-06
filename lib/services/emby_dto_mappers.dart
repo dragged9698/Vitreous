@@ -5,7 +5,7 @@ import '../media/media_backend.dart';
 import '../media/media_item.dart';
 import '../media/media_kind.dart';
 
-/// Maps [BaseItemDto] from `emby_core` into Plezy neutral [MediaItem] types.
+/// Maps [BaseItemDto] from `emby_core` into Vitreous neutral [MediaItem] types.
 class EmbyDtoMappers {
   const EmbyDtoMappers._();
 

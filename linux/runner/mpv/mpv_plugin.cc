@@ -3,6 +3,8 @@
 #include <cstring>
 
 #include "mpv_texture.h"
+#include "window_keep_above.h"
+#include "window_pip.h"
 
 struct _MpvPlugin {
   GObject parent_instance;
@@ -82,9 +84,34 @@ static GtkWindow* mpv_plugin_toplevel(MpvPlugin* self) {
 
 static void mpv_plugin_apply_keep_above(MpvPlugin* self, gboolean keep_above) {
   GtkWindow* window = mpv_plugin_toplevel(self);
-  if (window) gtk_window_set_keep_above(window, keep_above);
+  g_message("MpvPlugin: setKeepAbove=%d hasWindow=%d", keep_above, window != nullptr);
+  if (window) emby_window_set_keep_above(window, keep_above);
   if (self->player) self->player->SetEmbedKeepAbove(keep_above == TRUE);
   self->keep_above = keep_above;
+}
+
+static FlValue* emby_bounds_to_flvalue(const EmbyWindowBounds* bounds) {
+  g_autoptr(FlValue) map = fl_value_new_map();
+  fl_value_set_string_take(map, "x", fl_value_new_int(bounds->x));
+  fl_value_set_string_take(map, "y", fl_value_new_int(bounds->y));
+  fl_value_set_string_take(map, "width", fl_value_new_int(bounds->width));
+  fl_value_set_string_take(map, "height", fl_value_new_int(bounds->height));
+  return fl_value_ref(map);
+}
+
+static gboolean emby_bounds_from_flvalue(FlValue* args, EmbyWindowBounds* bounds) {
+  if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) return FALSE;
+  auto read_int = [&](const char* key) -> int {
+    FlValue* value = fl_value_lookup_string(args, key);
+    return (value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_INT)
+        ? static_cast<int>(fl_value_get_int(value))
+        : 0;
+  };
+  bounds->x = read_int("x");
+  bounds->y = read_int("y");
+  bounds->width = read_int("width");
+  bounds->height = read_int("height");
+  return bounds->width > 0 && bounds->height > 0;
 }
 
 MpvPlugin* mpv_plugin_new(FlPluginRegistrar* registrar) {
@@ -96,12 +123,12 @@ MpvPlugin* mpv_plugin_new(FlPluginRegistrar* registrar) {
 
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
   self->method_channel = fl_method_channel_new(
-      fl_plugin_registrar_get_messenger(registrar), "com.plezy/mpv_player", FL_METHOD_CODEC(codec));
+      fl_plugin_registrar_get_messenger(registrar), "com.vitreous/mpv_player", FL_METHOD_CODEC(codec));
 
   fl_method_channel_set_method_call_handler(self->method_channel, mpv_plugin_handle_method_call, self, nullptr);
 
   self->event_channel = fl_event_channel_new(
-      fl_plugin_registrar_get_messenger(registrar), "com.plezy/mpv_player/events", FL_METHOD_CODEC(codec));
+      fl_plugin_registrar_get_messenger(registrar), "com.vitreous/mpv_player/events", FL_METHOD_CODEC(codec));
 
   return self;
 }
@@ -366,6 +393,51 @@ static void mpv_plugin_handle_method_call(FlMethodChannel* channel, FlMethodCall
     }
   } else if (strcmp(method, "isKeepAbove") == 0) {
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_bool(self->keep_above)));
+  } else if (strcmp(method, "getWindowBounds") == 0) {
+    GtkWindow* window = mpv_plugin_toplevel(self);
+    EmbyWindowBounds bounds = {};
+    if (window && emby_window_get_bounds(window, &bounds)) {
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(emby_bounds_to_flvalue(&bounds)));
+    } else {
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new("NO_WINDOW", "No GTK window", nullptr));
+    }
+  } else if (strcmp(method, "enterDesktopPip") == 0) {
+    GtkWindow* window = mpv_plugin_toplevel(self);
+    EmbyWindowBounds bounds = {};
+    if (!window) {
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new("NO_WINDOW", "No GTK window", nullptr));
+    } else if (!emby_bounds_from_flvalue(args, &bounds)) {
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new("INVALID_ARGS", "Missing bounds", nullptr));
+    } else {
+      const gboolean ok = emby_window_enter_pip(window, &bounds);
+      if (ok) {
+        mpv_plugin_apply_keep_above(self, TRUE);
+      }
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_bool(ok)));
+    }
+  } else if (strcmp(method, "exitDesktopPip") == 0) {
+    GtkWindow* window = mpv_plugin_toplevel(self);
+    if (!window) {
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new("NO_WINDOW", "No GTK window", nullptr));
+    } else {
+      EmbyWindowBounds restore = {};
+      const EmbyWindowBounds* restore_ptr = nullptr;
+      if (emby_bounds_from_flvalue(args, &restore)) {
+        restore_ptr = &restore;
+      }
+      const gboolean ok = emby_window_exit_pip(window, restore_ptr);
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_bool(ok)));
+    }
+  } else if (strcmp(method, "isDesktopPipActive") == 0) {
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_bool(emby_window_pip_is_active())));
+  } else if (strcmp(method, "startWindowDrag") == 0) {
+    GtkWindow* window = mpv_plugin_toplevel(self);
+    if (window) {
+      emby_window_start_drag(window);
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_bool(TRUE)));
+    } else {
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new("NO_WINDOW", "No GTK window", nullptr));
+    }
   } else {
     response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
   }

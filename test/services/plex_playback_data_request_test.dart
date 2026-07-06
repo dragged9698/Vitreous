@@ -35,7 +35,7 @@ void main() {
         baseUrl: 'https://plex.example.com',
         token: 'token',
         clientIdentifier: 'client-id',
-        product: 'Plezy',
+        product: 'Vitreous',
         version: '1',
       ),
       serverId: ServerId('server-id'),

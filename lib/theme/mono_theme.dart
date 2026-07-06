@@ -15,15 +15,15 @@ ThemeData monoTheme({required bool dark, bool oled = false}) {
     );
   } else if (dark) {
     c = (
-      bg: const Color(0xFF0E0F12),
-      surface: const Color(0xFF15171C),
+      bg: const Color(0xFF08090D),
+      surface: const Color(0xFF14161C),
       outline: const Color(0x1FFFFFFF),
       text: const Color(0xFFEDEDED),
       textMuted: const Color(0x99EDEDED),
     );
   } else {
     c = (
-      bg: const Color(0xFFF7F7F8),
+      bg: const Color(0xFFF4F4F9),
       surface: const Color(0xFFFFFFFF),
       outline: const Color(0x19000000),
       text: const Color(0xFF111111),

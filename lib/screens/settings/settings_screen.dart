@@ -33,7 +33,8 @@ import '../../utils/dialogs.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/platform_detector.dart';
 import '../../utils/update_dialog.dart';
-import '../../widgets/desktop_app_bar.dart';
+import '../../widgets/emby_glass_settings.dart';
+import '../../widgets/emby_glass_shell.dart';
 import '../../widgets/dialog_action_button.dart';
 import '../../widgets/setting_tile.dart';
 import '../../widgets/settings_builder.dart';
@@ -136,49 +137,35 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Focus(
-        onKeyEvent: _handleKeyEvent,
-        child: CustomScrollView(
-          primary: false,
-          slivers: [
-            ExcludeFocus(child: CustomAppBar(title: Text(t.settings.title), pinned: true)),
-            SliverList(
-              delegate: SliverChildListDelegate([
-                if (DonationService.isEnabled) _buildDonateTile(),
-
-                _buildAppearanceTile(),
-
-                _buildPlaybackTile(),
-
-                _buildTrackersTile(),
-
-                _buildConnectionsSection(),
-
-                _buildProfilesSection(),
-
-                if (!PlatformDetector.isAppleTV()) _buildDownloadsSection(),
-
-                if (_keyboardShortcutsSupported) ...[_buildKeyboardShortcutsSection()],
-
-                _buildAdvancedSection(),
-
-                if (UpdateService.isUpdateCheckEnabled) ...[_buildUpdateSection()],
-
-                if (!PlatformDetector.isTV()) _buildBackupSection(),
-
-                SettingNavigationTile(
-                  focusNode: _focusTracker.get(_kAbout),
-                  icon: Symbols.info_rounded,
-                  title: t.settings.about,
-                  subtitle: t.settings.aboutDescription,
-                  destinationBuilder: (context) => const AboutScreen(),
-                ),
-                const SizedBox(height: 24),
-              ]),
-            ),
-          ],
-        ),
+    return Focus(
+      onKeyEvent: _handleKeyEvent,
+      child: EmbyGlassScrollScaffold(
+        title: Text(t.settings.title),
+        slivers: [
+          EmbyGlassSettingsSliver(
+            children: [
+              if (DonationService.isEnabled) _buildDonateTile(),
+              _buildAppearanceTile(),
+              _buildPlaybackTile(),
+              _buildTrackersTile(),
+              _buildConnectionsSection(),
+              _buildProfilesSection(),
+              if (!PlatformDetector.isAppleTV()) _buildDownloadsSection(),
+              if (_keyboardShortcutsSupported) ...[_buildKeyboardShortcutsSection()],
+              _buildAdvancedSection(),
+              if (UpdateService.isUpdateCheckEnabled) ...[_buildUpdateSection()],
+              if (!PlatformDetector.isTV()) _buildBackupSection(),
+              SettingNavigationTile(
+                focusNode: _focusTracker.get(_kAbout),
+                icon: Symbols.info_rounded,
+                title: t.settings.about,
+                subtitle: t.settings.aboutDescription,
+                destinationBuilder: (context) => const AboutScreen(),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -200,20 +187,17 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
   }
 
   Widget _buildAppearanceTile() {
-    return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, _) => SettingValueBuilder<int>(
-        pref: settings.SettingsService.libraryDensity,
-        builder: (context, libraryDensity, _) {
-          final summary = '${themeProvider.themeModeDisplayName} · ${t.settings.libraryDensity} $libraryDensity';
-          return SettingNavigationTile(
-            focusNode: _focusTracker.get(_kAppearance),
-            icon: Symbols.palette_rounded,
-            title: t.settings.appearance,
-            subtitle: summary,
-            destinationBuilder: (context) => const AppearanceSettingsScreen(),
-          );
-        },
-      ),
+    return SettingValueBuilder<int>(
+      pref: settings.SettingsService.libraryDensity,
+      builder: (context, libraryDensity, _) {
+        return SettingNavigationTile(
+          focusNode: _focusTracker.get(_kAppearance),
+          icon: Symbols.tune_rounded,
+          title: t.settings.appearance,
+          subtitle: '${t.settings.libraryDensity} $libraryDensity',
+          destinationBuilder: (context) => const AppearanceSettingsScreen(),
+        );
+      },
     );
   }
 

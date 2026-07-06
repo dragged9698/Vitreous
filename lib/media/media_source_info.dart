@@ -260,6 +260,43 @@ class MediaMarker {
   }
 }
 
+/// Stable key for a marker window within one playback session.
+String playbackMarkerSessionKey(MediaMarker marker) =>
+    '${marker.type}:${marker.startTimeOffset}:${marker.endTimeOffset}';
+
+/// Drops intro/credits markers with impossible spans (e.g. intro ending at EOF).
+List<MediaMarker> sanitizePlaybackMarkers(
+  List<MediaMarker> markers, {
+  int? durationMs,
+}) {
+  const maxIntroMs = 5 * 60 * 1000;
+  const minMarkerMs = 1000;
+  const endMarginMs = 10 * 1000;
+
+  final out = <MediaMarker>[];
+  for (final marker in markers) {
+    final start = marker.startTimeOffset;
+    final end = marker.endTimeOffset;
+    if (end <= start || end - start < minMarkerMs) continue;
+
+    if (marker.isIntro) {
+      if (end - start > maxIntroMs) continue;
+      if (durationMs != null && durationMs > 0) {
+        if (start >= durationMs - endMarginMs) continue;
+        if (end > durationMs - endMarginMs) continue;
+        if (end - start > durationMs ~/ 2) continue;
+      }
+    }
+
+    if (marker.isCredits && durationMs != null && durationMs > 0) {
+      if (end <= durationMs ~/ 2) continue;
+    }
+
+    out.add(marker);
+  }
+  return out;
+}
+
 /// Combined chapters and markers fetched in a single API call
 class PlaybackExtras {
   final List<MediaChapter> chapters;

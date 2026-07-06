@@ -11,7 +11,10 @@ import 'package:flutter/services.dart'
     show HardwareKeyboard, KeyDownEvent, KeyRepeatEvent, KeyUpEvent, LogicalKeyboardKey;
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:window_manager/window_manager.dart';
+import '../theme/emby_glass_theme.dart';
+import '../theme/emby_shell_backdrop.dart';
 import '../i18n/strings.g.dart';
 import '../services/app_exit_service.dart';
 import '../services/tvos_system_navigation_service.dart';
@@ -25,6 +28,7 @@ import '../utils/update_dialog.dart';
 import '../utils/video_player_navigation.dart';
 import '../mixins/mounted_set_state_mixin.dart';
 import '../mixins/refreshable.dart';
+import '../widgets/emby_floating_glass_bar.dart';
 import '../widgets/overlay_sheet.dart';
 import '../mixins/tab_visibility_aware.dart';
 import '../navigation/navigation_tabs.dart';
@@ -67,6 +71,24 @@ import '../watch_together/watch_together.dart';
 // MainScreenFocusScope and SideNavigationBleedBuilder live in
 // navigation/main_screen_scope.dart (re-exported above) so widgets like the
 // browse rail can import the scope without an import cycle through this file.
+
+@visibleForTesting
+({double top, double height, double left, double width}) mainScreenTopNavigationContentLayout({
+  required double viewportWidth,
+  required double viewportHeight,
+  required double reservedTopNavigationHeight,
+  required bool topBarOverlaysContent,
+}) {
+  if (topBarOverlaysContent) {
+    return (top: 0, height: viewportHeight, left: 0, width: viewportWidth);
+  }
+  return (
+    top: reservedTopNavigationHeight,
+    height: (viewportHeight - reservedTopNavigationHeight).clamp(0.0, double.infinity),
+    left: 0,
+    width: viewportWidth,
+  );
+}
 
 @visibleForTesting
 ({double left, double width}) mainScreenSideNavigationContentLayout({
@@ -1120,11 +1142,17 @@ class _MainScreenState extends State<MainScreen>
     _updateTvosMenuPassthrough();
   }
 
-  double _sideNavigationWidth(BuildContext context, {required bool alwaysExpanded}) {
+  double _topNavigationReservedHeight(BuildContext context, {required bool alwaysExpanded}) {
+    final revealExtent = _sideNavKey.currentState?.librariesRevealExtent ?? 0;
     final isExpanded = alwaysExpanded || _isSidebarFocused || _isSidebarInteractionExpanded;
-    return isExpanded
-        ? SideNavigationRailState.expandedWidth
-        : SideNavigationRailState.collapsedWidthForContext(context);
+    if (!isExpanded) {
+      return SideNavigationRailState.reservedHeightForContext(context);
+    }
+    return SideNavigationRailState.currentHeightForContext(context, librariesRevealExtent: revealExtent);
+  }
+
+  double _sideNavigationWidth(BuildContext context, {required bool alwaysExpanded}) {
+    return _topNavigationReservedHeight(context, alwaysExpanded: alwaysExpanded);
   }
 
   bool get _shouldPassTvosMenuToSystem {
@@ -1546,49 +1574,54 @@ class _MainScreenState extends State<MainScreen>
   Widget _buildBottomNavigationBar(BuildContext context, {required bool hideLabels}) {
     final tabs = _getBottomNavigationTabs(context);
     final selectedIndex = tabs.indexWhere((tab) => tab.id == _currentTab);
-    final navigationBar = NavigationBar(
-      selectedIndex: selectedIndex >= 0 ? selectedIndex : 0,
-      onDestinationSelected: (i) {
+    final effectiveIndex = selectedIndex >= 0 ? selectedIndex : 0;
+
+    final glassTabs = tabs.map((tab) => tab.toGlassTab(hideLabel: hideLabels)).toList();
+    final glassBar = GlassTabBar.bottom(
+      tabs: glassTabs,
+      selectedIndex: effectiveIndex,
+      adaptiveBrightness: true,
+      onTabSelected: (i) {
         if (i >= 0 && i < tabs.length) _selectTab(tabs[i].id);
       },
-      labelBehavior: hideLabels
-          ? NavigationDestinationLabelBehavior.alwaysHide
-          : NavigationDestinationLabelBehavior.alwaysShow,
-      destinations: tabs.map((tab) => tab.toDestination()).toList(),
     );
 
     final librariesIndex = tabs.indexWhere((tab) => tab.id == NavigationTabId.libraries);
-    if (librariesIndex < 0 || tabs.isEmpty) return navigationBar;
+    if (librariesIndex < 0 || tabs.isEmpty) {
+      return EmbyFloatingGlassBar(child: glassBar);
+    }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (!constraints.hasBoundedWidth) return navigationBar;
+    return EmbyFloatingGlassBar(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (!constraints.hasBoundedWidth) return glassBar;
 
-        final itemWidth = constraints.maxWidth / tabs.length;
-        final isRtl = Directionality.of(context) == TextDirection.rtl;
-        final left = isRtl ? constraints.maxWidth - (itemWidth * (librariesIndex + 1)) : itemWidth * librariesIndex;
+          final itemWidth = constraints.maxWidth / tabs.length;
+          final isRtl = Directionality.of(context) == TextDirection.rtl;
+          final left = isRtl ? constraints.maxWidth - (itemWidth * (librariesIndex + 1)) : itemWidth * librariesIndex;
 
-        return Stack(
-          children: [
-            navigationBar,
-            Positioned(
-              left: left,
-              top: 0,
-              bottom: 0,
-              width: itemWidth,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                excludeFromSemantics: true,
-                onLongPress: () {
-                  Feedback.forLongPress(context);
-                  _showLibraryQuickPicker(context);
-                },
-                child: const SizedBox.expand(),
+          return Stack(
+            children: [
+              glassBar,
+              Positioned(
+                left: left,
+                top: 0,
+                bottom: 0,
+                width: itemWidth,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  excludeFromSemantics: true,
+                  onLongPress: () {
+                    Feedback.forLongPress(context);
+                    _showLibraryQuickPicker(context);
+                  },
+                  child: const SizedBox.expand(),
+                ),
               ),
-            ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -1605,9 +1638,7 @@ class _MainScreenState extends State<MainScreen>
         pref: SettingsService.alwaysKeepSidebarOpen,
         builder: (context, alwaysExpanded, _) {
           final targetContentOffset = _sideNavigationWidth(context, alwaysExpanded: alwaysExpanded);
-          final reservedContentOffset = alwaysExpanded
-              ? SideNavigationRailState.expandedWidth
-              : SideNavigationRailState.collapsedWidthForContext(context);
+          final reservedContentOffset = SideNavigationRailState.reservedHeightForContext(context);
 
           return OverlaySheetHost(
             onOpenChanged: _handleOverlaySheetOpenChanged,
@@ -1635,19 +1666,17 @@ class _MainScreenState extends State<MainScreen>
                   // autofocus from stealing focus back after setState() rebuilds
                   child: _buildTickerAwareStack(),
                 ),
-                builder: (context, contentLeftPadding, contentChild) {
+                builder: (context, contentTopPadding, contentChild) {
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       final viewportWidth = constraints.maxWidth;
-                      // Layout from the tween END value: deriving it from the
-                      // animated value changed MainScreenFocusScope every tick
-                      // of the sidebar expansion, rebuilding every dependent
-                      // (the whole TV content tree) per frame. The slide is a
-                      // paint-only translate on the content below instead.
-                      final contentLayout = mainScreenSideNavigationContentLayout(
+                      final viewportHeight = constraints.maxHeight;
+                      final topBarOverlaysContent = _currentTab == NavigationTabId.discover;
+                      final contentLayout = mainScreenTopNavigationContentLayout(
                         viewportWidth: viewportWidth,
-                        currentSideNavigationWidth: targetContentOffset,
-                        reservedSideNavigationWidth: reservedContentOffset,
+                        viewportHeight: viewportHeight,
+                        reservedTopNavigationHeight: reservedContentOffset,
+                        topBarOverlaysContent: topBarOverlaysContent,
                       );
                       return MainScreenFocusScope(
                         focusSidebar: _focusSidebar,
@@ -1655,33 +1684,34 @@ class _MainScreenState extends State<MainScreen>
                         isSidebarFocused: _isSidebarFocused,
                         sideNavigationWidth: targetContentOffset,
                         reservedSideNavigationWidth: reservedContentOffset,
-                        foregroundLeft: contentLayout.left,
-                        foregroundWidth: contentLayout.width,
+                        foregroundLeft: 0,
+                        foregroundWidth: viewportWidth,
                         viewportWidth: viewportWidth,
+                        sidebarOverlaysContent: topBarOverlaysContent,
                         selectLibrary: _selectLibrary,
                         openSettings: _openSettings,
                         child: SideNavigationScope(
-                          child: Stack(
-                            clipBehavior: Clip.hardEdge,
-                            children: [
-                              Positioned.fill(child: ColoredBox(color: Theme.of(context).scaffoldBackgroundColor)),
-                              Positioned(
-                                top: 0,
-                                bottom: 0,
-                                left: contentLayout.left,
-                                width: contentLayout.width,
-                                // Duration/curve of this tween must stay in
-                                // sync with SideNavigationBleedBuilder, which
-                                // counter-animates viewport-pinned overlays.
-                                child: Transform.translate(
-                                  offset: Offset(contentLeftPadding - targetContentOffset, 0),
-                                  child: contentChild!,
+                          child: GlassContentAwareScope(
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                              Positioned.fill(child: const EmbyShellBackdrop()),
+                              if (topBarOverlaysContent)
+                                Positioned.fill(
+                                  child: GlassContentAwareContent(child: contentChild!),
+                                )
+                              else
+                                Positioned(
+                                  top: contentLayout.top,
+                                  left: 0,
+                                  width: contentLayout.width,
+                                  height: contentLayout.height,
+                                  child: GlassContentAwareContent(child: contentChild!),
                                 ),
-                              ),
                               Positioned(
                                 top: 0,
-                                bottom: 0,
                                 left: 0,
+                                right: 0,
                                 child: FocusScope(
                                   node: _sidebarFocusScope,
                                   child: SideNavigationRail(
@@ -1693,6 +1723,7 @@ class _MainScreenState extends State<MainScreen>
                                     alwaysExpanded: alwaysExpanded,
                                     isReconnecting: _isReconnecting,
                                     onInteractionExpandedChanged: _handleSidebarInteractionExpandedChanged,
+                                    onChromeLayoutChanged: () => setState(() {}),
                                     onDestinationSelected: (tab) {
                                       final restorePreviousFocus = tab == _currentTab;
                                       _selectTab(tab);
@@ -1708,6 +1739,7 @@ class _MainScreenState extends State<MainScreen>
                                 ),
                               ),
                             ],
+                          ),
                           ),
                         ),
                       );
@@ -1732,9 +1764,15 @@ class _MainScreenState extends State<MainScreen>
       },
       child: ScaffoldMessenger(
         key: ProfileNavigationScope.of(context).mainScaffoldMessengerKey,
-        child: Scaffold(
-          body: _buildTickerAwareStack(),
-          bottomNavigationBar: Column(
+        child: GlassContentAwareScope(
+          child: GlassPage(
+            background: embyAppBackdrop(context),
+            statusBarStyle: GlassStatusBarStyle.auto,
+            child: Scaffold(
+              extendBody: true,
+              backgroundColor: Colors.transparent,
+              body: GlassContentAwareContent(child: _buildTickerAwareStack()),
+            bottomNavigationBar: Column(
             mainAxisSize: .min,
             children: [
               // Reconnect bar when offline
@@ -1777,13 +1815,12 @@ class _MainScreenState extends State<MainScreen>
                 pref: SettingsService.showNavBarLabels,
                 builder: (context, showNavBarLabels, _) {
                   final hideLabels = !showNavBarLabels;
-                  return NavigationBarTheme(
-                    data: NavigationBarTheme.of(context).copyWith(height: hideLabels ? 56 : null),
-                    child: _buildBottomNavigationBar(context, hideLabels: hideLabels),
-                  );
+                  return _buildBottomNavigationBar(context, hideLabels: hideLabels);
                 },
               ),
             ],
+          ),
+        ),
           ),
         ),
       ),

@@ -26,7 +26,7 @@ import '../../../utils/live_tv_player_navigation.dart';
 import '../../../utils/platform_detector.dart';
 import '../../../widgets/app_icon.dart';
 import '../../../widgets/app_menu.dart';
-import '../../../widgets/clickable_cursor.dart';
+import '../../../widgets/live_tv/emby_live_tv_chrome.dart';
 import '../../../widgets/overlay_sheet.dart';
 import '../../../widgets/live_tv_channel_logo.dart';
 import '../program_details_sheet.dart';
@@ -71,11 +71,11 @@ final class _GuideChannelRow extends _GuideRow {
 }
 
 class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBindingObserver {
-  static const _slotWidth = 180.0;
-  static const _channelColumnWidth = 132.0;
-  static const _rowHeight = 64.0;
-  static const _sourceHeaderRowHeight = 40.0;
-  static const _timeHeaderHeight = 40.0;
+  static const _slotWidth = EmbyLiveTvLayout.guideSlotWidth;
+  static const _channelColumnWidth = EmbyLiveTvLayout.guideChannelWidth;
+  static const _rowHeight = EmbyLiveTvLayout.guideRowHeight;
+  static const _sourceHeaderRowHeight = 36.0;
+  static const _timeHeaderHeight = EmbyLiveTvLayout.guideTimeHeaderHeight;
   static const _minutesPerSlot = 30;
   static const _longPressDuration = Duration(milliseconds: 500);
 
@@ -532,14 +532,17 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
 
   void _scrollToNow() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_gridHorizontalController.hasClients) return;
+      final slotWidth = _resolvedSlotWidth();
       final now = DateTime.now();
       final minutesSinceStart = now.difference(_gridStart).inMinutes;
-      final offset = (minutesSinceStart / _minutesPerSlot) * _slotWidth;
-      if (_gridHorizontalController.hasClients) {
-        _gridHorizontalController.jumpTo(
-          (offset - MediaQuery.sizeOf(context).width / 3).clamp(0, _gridHorizontalController.position.maxScrollExtent),
-        );
-      }
+      final offset = (minutesSinceStart / _minutesPerSlot) * slotWidth;
+      _gridHorizontalController.jumpTo(
+        (offset - _gridHorizontalController.position.viewportDimension / 3).clamp(
+          0,
+          _gridHorizontalController.position.maxScrollExtent,
+        ),
+      );
     });
   }
 
@@ -548,9 +551,26 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
       ..sort((a, b) => (a.beginsAt ?? 0).compareTo(b.beginsAt ?? 0));
   }
 
-  double _totalGridWidth() {
-    final totalMinutes = _gridEnd.difference(_gridStart).inMinutes;
-    return (totalMinutes / _minutesPerSlot) * _slotWidth;
+  int get _slotCount => _gridEnd.difference(_gridStart).inMinutes ~/ _minutesPerSlot;
+
+  /// Scales 30-minute columns to fill the program viewport when the fixed slot
+  /// width would leave empty space on wide screens.
+  double _effectiveSlotWidth(double programViewportWidth) {
+    final slotCount = _slotCount;
+    if (slotCount <= 0) return _slotWidth;
+    final naturalWidth = slotCount * _slotWidth;
+    return naturalWidth >= programViewportWidth ? _slotWidth : programViewportWidth / slotCount;
+  }
+
+  double _resolvedSlotWidth() {
+    if (_gridHorizontalController.hasClients) {
+      return _effectiveSlotWidth(_gridHorizontalController.position.viewportDimension);
+    }
+    return _slotWidth;
+  }
+
+  double _totalGridWidth(double slotWidth) {
+    return _slotCount * slotWidth;
   }
 
   Future<void> _tuneChannel(LiveTvChannel channel) async {
@@ -852,8 +872,9 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
     final gridStartEpoch = _gridStart.millisecondsSinceEpoch ~/ 1000;
     final gridEndEpoch = _gridEnd.millisecondsSinceEpoch ~/ 1000;
     final progStart = (program.beginsAt ?? gridStartEpoch).clamp(gridStartEpoch, gridEndEpoch);
+    final slotWidth = _resolvedSlotWidth();
     final startOffset = progStart - gridStartEpoch;
-    final left = (startOffset / (_minutesPerSlot * 60)) * _slotWidth;
+    final left = (startOffset / (_minutesPerSlot * 60)) * slotWidth;
 
     final viewportWidth = _gridHorizontalController.position.viewportDimension;
     final currentOffset = _gridHorizontalController.offset;
@@ -891,93 +912,136 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
           children: [
             _buildTimeNavigation(theme),
             Expanded(
-              child: ListenableBuilder(
-                listenable: _gridHorizontalController,
-                builder: (context, child) {
-                  return Stack(children: [child!, _buildNowIndicatorOverlay(theme)]);
-                },
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        const SizedBox(width: _channelColumnWidth, height: _timeHeaderHeight),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            controller: _headerHorizontalController,
-                            scrollDirection: Axis.horizontal,
-                            physics: const ClampingScrollPhysics(),
-                            child: SizedBox(
-                              width: _totalGridWidth(),
-                              height: _timeHeaderHeight,
-                              child: _buildTimeHeader(theme),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Expanded(
-                      child: Row(
+              child: EmbyLiveTvGuideFrame(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final programViewportWidth = (constraints.maxWidth - _channelColumnWidth).clamp(0.0, double.infinity);
+                    final slotWidth = _effectiveSlotWidth(programViewportWidth);
+                    final gridWidth = _totalGridWidth(slotWidth);
+
+                    return ListenableBuilder(
+                      listenable: _gridHorizontalController,
+                      builder: (context, child) {
+                        return Stack(children: [child!, _buildNowIndicatorOverlay(theme, slotWidth)]);
+                      },
+                      child: Column(
                         children: [
-                          SizedBox(
-                            width: _channelColumnWidth,
-                            child: ListView.builder(
-                              controller: _channelVerticalController,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: rows.length,
-                              itemBuilder: (context, index) {
-                                final row = rows[index];
-                                return switch (row) {
-                                  _GuideSourceHeaderRow(:final label) => _buildSourceHeaderCell(label, theme),
-                                  _GuideChannelRow(:final channel, :final channelIndex) => _buildChannelCell(
-                                    channel,
-                                    theme,
-                                    index: channelIndex,
-                                  ),
-                                };
-                              },
-                            ),
-                          ),
-                          Expanded(
-                            child: NotificationListener<ScrollNotification>(
-                              onNotification: (notification) {
-                                if (notification is ScrollUpdateNotification &&
-                                    notification.metrics.axis == Axis.vertical) {
-                                  if (_channelVerticalController.hasClients) {
-                                    _channelVerticalController.jumpTo(notification.metrics.pixels);
-                                  }
-                                }
-                                return false;
-                              },
-                              child: SingleChildScrollView(
-                                controller: _gridHorizontalController,
-                                scrollDirection: Axis.horizontal,
-                                physics: const ClampingScrollPhysics(),
-                                child: SizedBox(
-                                  width: _totalGridWidth(),
-                                  child: ListView.builder(
-                                    controller: _gridVerticalController,
-                                    itemCount: rows.length,
-                                    itemBuilder: (context, index) {
-                                      final row = rows[index];
-                                      return switch (row) {
-                                        _GuideSourceHeaderRow(:final label) => _buildSourceHeaderGridRow(label, theme),
-                                        _GuideChannelRow(:final channel, :final channelIndex) => _buildProgramRow(
-                                          channel,
-                                          _getProgramsForChannel(channel),
-                                          theme,
-                                          channelIndex: channelIndex,
-                                        ),
-                                      };
-                                    },
+                          Row(
+                            children: [
+                              SizedBox(
+                                width: _channelColumnWidth,
+                                height: _timeHeaderHeight,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                                    border: Border(
+                                      bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.12)),
+                                      right: BorderSide(color: theme.dividerColor.withValues(alpha: 0.12)),
+                                    ),
                                   ),
                                 ),
                               ),
+                              Expanded(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                                    border: Border(
+                                      bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.12)),
+                                    ),
+                                  ),
+                                  child: SingleChildScrollView(
+                                    controller: _headerHorizontalController,
+                                    scrollDirection: Axis.horizontal,
+                                    physics: const ClampingScrollPhysics(),
+                                    child: SizedBox(
+                                      width: gridWidth,
+                                      height: _timeHeaderHeight,
+                                      child: _buildTimeHeader(theme, slotWidth),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
+                                    border: Border(
+                                      right: BorderSide(color: theme.dividerColor.withValues(alpha: 0.12)),
+                                    ),
+                                  ),
+                                  child: SizedBox(
+                                    width: _channelColumnWidth,
+                                    child: ListView.builder(
+                                      controller: _channelVerticalController,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      itemCount: rows.length,
+                                      itemBuilder: (context, index) {
+                                        final row = rows[index];
+                                        return switch (row) {
+                                          _GuideSourceHeaderRow(:final label) => _buildSourceHeaderCell(label, theme),
+                                          _GuideChannelRow(:final channel, :final channelIndex) => _buildChannelCell(
+                                            channel,
+                                            theme,
+                                            index: channelIndex,
+                                          ),
+                                        };
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: NotificationListener<ScrollNotification>(
+                                    onNotification: (notification) {
+                                      if (notification is ScrollUpdateNotification &&
+                                          notification.metrics.axis == Axis.vertical) {
+                                        if (_channelVerticalController.hasClients) {
+                                          _channelVerticalController.jumpTo(notification.metrics.pixels);
+                                        }
+                                      }
+                                      return false;
+                                    },
+                                    child: SingleChildScrollView(
+                                      controller: _gridHorizontalController,
+                                      scrollDirection: Axis.horizontal,
+                                      physics: const ClampingScrollPhysics(),
+                                      child: SizedBox(
+                                        width: gridWidth,
+                                        child: ListView.builder(
+                                          controller: _gridVerticalController,
+                                          itemCount: rows.length,
+                                          itemBuilder: (context, index) {
+                                            final row = rows[index];
+                                            return switch (row) {
+                                              _GuideSourceHeaderRow(:final label) => _buildSourceHeaderGridRow(
+                                                label,
+                                                theme,
+                                              ),
+                                              _GuideChannelRow(:final channel, :final channelIndex) =>
+                                                _buildProgramRow(
+                                                  channel,
+                                                  _getProgramsForChannel(channel),
+                                                  theme,
+                                                  channelIndex: channelIndex,
+                                                  slotWidth: slotWidth,
+                                                ),
+                                            };
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -987,13 +1051,13 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
     );
   }
 
-  Widget _buildNowIndicatorOverlay(ThemeData _) {
+  Widget _buildNowIndicatorOverlay(ThemeData _, double slotWidth) {
     final now = DateTime.now();
     if (now.isBefore(_gridStart) || now.isAfter(_gridEnd)) {
       return const SizedBox.shrink();
     }
     final minutesSinceStart = now.difference(_gridStart).inMinutes.toDouble();
-    final nowOffset = (minutesSinceStart / _minutesPerSlot) * _slotWidth;
+    final nowOffset = (minutesSinceStart / _minutesPerSlot) * slotWidth;
     final scrollOffset = _gridHorizontalController.hasClients ? _gridHorizontalController.offset : 0.0;
     final left = _channelColumnWidth + nowOffset - scrollOffset;
 
@@ -1006,7 +1070,17 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
       left: left,
       top: 0,
       height: gridHeight,
-      child: IgnorePointer(child: Container(width: 2, color: Colors.red)),
+      child: IgnorePointer(
+        child: Container(
+          width: 2,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF3B30),
+            boxShadow: [
+              BoxShadow(color: const Color(0xFFFF3B30).withValues(alpha: 0.55), blurRadius: 10, spreadRadius: 1),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1132,69 +1206,18 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
     final timeLabel = formatClockTime(_gridStart, is24Hour: MediaQuery.alwaysUse24HourFormatOf(context));
     final dayLabel = _dayLabel(_gridStart);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3))),
-      ),
-      child: Row(
-        children: [
-          _timeNavFocusWrap(
-            index: 0,
-            theme: theme,
-            child: IconButton(
-              icon: const AppIcon(Symbols.chevron_left_rounded),
-              onPressed: () => _shiftTimeRange(-2),
-              iconSize: 20,
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: .center,
-              children: [
-                _timeNavFocusWrap(
-                  index: 1,
-                  theme: theme,
-                  child: ClickableCursor(
-                    child: GestureDetector(
-                      key: _dayPickerKey,
-                      onTap: _showDayPicker,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: Row(
-                          mainAxisSize: .min,
-                          children: [
-                            Text(dayLabel, style: theme.textTheme.labelLarge),
-                            const SizedBox(width: 2),
-                            AppIcon(Symbols.arrow_drop_down_rounded, size: 18, color: theme.colorScheme.onSurface),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(timeLabel, style: theme.textTheme.labelLarge),
-              ],
-            ),
-          ),
-          _timeNavFocusWrap(
-            index: 2,
-            theme: theme,
-            child: IconButton(
-              icon: const AppIcon(Symbols.chevron_right_rounded),
-              onPressed: () => _shiftTimeRange(2),
-              iconSize: 20,
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
-        ],
-      ),
+    return EmbyLiveTvTimeNav(
+      dayLabel: dayLabel,
+      timeLabel: timeLabel,
+      dayPickerKey: _dayPickerKey,
+      onPrevious: () => _shiftTimeRange(-2),
+      onNext: () => _shiftTimeRange(2),
+      onDayTap: _showDayPicker,
+      focusWrap: ({required child, required index}) => _timeNavFocusWrap(child: child, index: index, theme: theme),
     );
   }
 
-  Widget _buildTimeHeader(ThemeData theme) {
+  Widget _buildTimeHeader(ThemeData theme, double slotWidth) {
     final is24Hour = MediaQuery.alwaysUse24HourFormatOf(context);
     final slots = <Widget>[];
     var current = _gridStart;
@@ -1203,14 +1226,19 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
       final timeStr = formatClockTime(current, is24Hour: is24Hour);
       slots.add(
         SizedBox(
-          width: _slotWidth,
+          width: slotWidth,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Align(
               alignment: .centerLeft,
               child: Text(
                 timeStr,
-                style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.9),
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  letterSpacing: -0.1,
+                ),
               ),
             ),
           ),
@@ -1225,20 +1253,21 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
   Widget _buildSourceHeaderCell(String label, ThemeData theme) {
     return Container(
       height: _sourceHeaderRowHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        border: Border(
-          bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
-          right: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
-        ),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1))),
       ),
       alignment: .centerLeft,
       child: Text(
         label,
-        style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontWeight: .w700),
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
         maxLines: 2,
-        overflow: .ellipsis,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
@@ -1247,8 +1276,8 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
     return Container(
       height: _sourceHeaderRowHeight,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3))),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1))),
       ),
       child: ClipRect(
         child: ListenableBuilder(
@@ -1326,12 +1355,13 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
     List<LiveTvProgram> programs,
     ThemeData theme, {
     required int channelIndex,
+    required double slotWidth,
   }) {
     if (programs.isEmpty) {
       return Container(
         height: _rowHeight,
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3))),
+          border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.08))),
         ),
         child: Center(
           child: Text(
@@ -1360,22 +1390,21 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
 
       final startOffset = progStart - gridStartEpoch;
       final duration = progEnd - progStart;
-      final left = (startOffset / (_minutesPerSlot * 60)) * _slotWidth;
-      final width = (duration / (_minutesPerSlot * 60)) * _slotWidth;
-      final clampedWidth = width.clamp(2.0, double.infinity);
+      final left = (startOffset / (_minutesPerSlot * 60)) * slotWidth;
+      final width = (duration / (_minutesPerSlot * 60)) * slotWidth;
+      final gap = EmbyLiveTvLayout.programBlockGap;
+      final clampedWidth = (width - gap * 2).clamp(4.0, double.infinity);
 
       blocks.add(
         Positioned(
-          left: left,
+          left: left + gap,
           width: clampedWidth,
-          top: 0,
-          bottom: 0,
+          top: EmbyLiveTvLayout.programBlockInsetV,
+          bottom: EmbyLiveTvLayout.programBlockInsetV,
           child: _buildProgramBlock(
             channel,
             program,
             theme,
-            isFirst: progStart == gridStartEpoch,
-            isLast: program == programs.last && progEnd != gridEndEpoch,
             isFocused: identical(program, focusProg),
             tileLeft: left,
             tileWidth: clampedWidth,
@@ -1387,7 +1416,8 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
     return Container(
       height: _rowHeight,
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3))),
+        color: channelIndex.isEven ? theme.colorScheme.onSurface.withValues(alpha: 0.02) : Colors.transparent,
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.08))),
       ),
       child: Stack(children: blocks),
     );
@@ -1397,8 +1427,6 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
     LiveTvChannel channel,
     LiveTvProgram program,
     ThemeData theme, {
-    bool isFirst = false,
-    bool isLast = false,
     bool isFocused = false,
     double tileLeft = 0,
     double tileWidth = 0,
@@ -1409,11 +1437,11 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
 
     Color materialColor;
     if (isFocused) {
-      materialColor = theme.colorScheme.primary.withValues(alpha: 0.15);
+      materialColor = theme.colorScheme.primary.withValues(alpha: 0.18);
     } else if (isCurrentlyAiring) {
-      materialColor = theme.colorScheme.onSurface.withValues(alpha: 0.12);
+      materialColor = theme.colorScheme.primary.withValues(alpha: 0.1);
     } else {
-      materialColor = theme.colorScheme.onSurface.withValues(alpha: 0.05);
+      materialColor = theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55);
     }
 
     Color titleColor;
@@ -1435,35 +1463,43 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
     }
 
     return Opacity(
-      opacity: isPast ? 0.5 : 1.0,
+      opacity: isPast ? 0.55 : 1.0,
       child: Material(
-        color: isFocused ? materialColor : Colors.transparent,
+        color: Colors.transparent,
+        elevation: isFocused ? 2 : 0,
+        shadowColor: theme.colorScheme.primary.withValues(alpha: 0.35),
         shape: RoundedRectangleBorder(
-          side: isFocused ? BorderSide(color: theme.colorScheme.primary, width: 2) : BorderSide.none,
+          borderRadius: BorderRadius.circular(EmbyLiveTvLayout.programBlockRadius),
+          side: isFocused
+              ? BorderSide(color: theme.colorScheme.primary, width: 1.5)
+              : isCurrentlyAiring
+              ? BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.45), width: 1)
+              : BorderSide(color: theme.colorScheme.onSurface.withValues(alpha: 0.06)),
         ),
         child: InkWell(
           mouseCursor: SystemMouseCursors.click,
           canRequestFocus: false,
+          borderRadius: BorderRadius.circular(EmbyLiveTvLayout.programBlockRadius),
           onTap: () => _activateProgram(channel, program),
           onLongPress: () => _showProgramDetails(channel, program),
           onSecondaryTap: () => _showProgramDetails(channel, program),
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border(
-                left: isFirst ? BorderSide.none : BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
-                right: isLast ? BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)) : BorderSide.none,
-              ),
-            ),
-            child: ListenableBuilder(
-              listenable: _gridHorizontalController,
-              builder: (context, _) {
-                const basePadding = 6.0;
-                final scrollOffset = _gridHorizontalController.hasClients ? _gridHorizontalController.offset : 0.0;
-                final maxInset = (tileWidth - 2 * basePadding - 20).clamp(0.0, double.infinity);
-                final leftInset = (scrollOffset - tileLeft).clamp(0.0, maxInset);
-                return Container(
-                  color: isFocused ? null : materialColor,
-                  padding: .fromLTRB(basePadding + leftInset, 4, basePadding, 4),
+          child: ListenableBuilder(
+            listenable: _gridHorizontalController,
+            builder: (context, _) {
+              const basePadding = 8.0;
+              final scrollOffset = _gridHorizontalController.hasClients ? _gridHorizontalController.offset : 0.0;
+              final maxInset = (tileWidth - 2 * basePadding - 20).clamp(0.0, double.infinity);
+              final leftInset = (scrollOffset - tileLeft).clamp(0.0, maxInset);
+              return DecoratedBox(
+                decoration: BoxDecoration(
+                  color: materialColor,
+                  borderRadius: BorderRadius.circular(EmbyLiveTvLayout.programBlockRadius),
+                  border: isCurrentlyAiring && !isFocused
+                      ? Border(left: BorderSide(color: theme.colorScheme.primary, width: 3))
+                      : null,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(basePadding + leftInset, 5, basePadding, 5),
                   child: Column(
                     crossAxisAlignment: .start,
                     mainAxisAlignment: .center,
@@ -1479,7 +1515,7 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
                               program.grandparentTitle ?? program.title,
                               style: theme.textTheme.bodyMedium?.copyWith(fontWeight: .w600, color: titleColor),
                               maxLines: 1,
-                              overflow: .ellipsis,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -1489,20 +1525,20 @@ class GuideTabState extends State<GuideTab> with MountedSetStateMixin, WidgetsBi
                           '${program.parentIndex != null && program.index != null ? 'S${program.parentIndex}E${program.index} · ' : ''}${program.title}',
                           style: theme.textTheme.labelSmall?.copyWith(color: subtitleColor),
                           maxLines: 1,
-                          overflow: .ellipsis,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       if (program.startTime != null)
                         Text(
                           '${formatClockTime(program.startTime!, is24Hour: MediaQuery.alwaysUse24HourFormatOf(context))} · ${formatDurationTextual(program.durationMinutes * 60_000)}',
                           style: theme.textTheme.labelSmall?.copyWith(color: subtitleColor),
                           maxLines: 1,
-                          overflow: .ellipsis,
+                          overflow: TextOverflow.ellipsis,
                         ),
                     ],
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -1612,12 +1648,9 @@ class _ChannelCellState extends State<_ChannelCell> {
             onLongPress: widget.onLongPress,
             child: Container(
               height: widget.rowHeight,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
               decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
-                  right: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
-                ),
+                border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.08))),
               ),
               child: Stack(
                 alignment: .center,

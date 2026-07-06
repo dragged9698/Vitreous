@@ -50,6 +50,9 @@ class VideoTimelineBar extends StatelessWidget {
   /// Optional UI-only position used while a remote/keyboard seek is pending.
   final Duration? previewPosition;
 
+  /// When set with [horizontalLayout], timestamps render outside [sliderWrapper].
+  final Widget Function(Widget slider)? sliderWrapper;
+
   const VideoTimelineBar({
     super.key,
     required this.player,
@@ -69,6 +72,7 @@ class VideoTimelineBar extends StatelessWidget {
     this.thumbnailDataBuilder,
     this.showKeyRepeatThumbnail = false,
     this.previewPosition,
+    this.sliderWrapper,
   });
 
   @override
@@ -114,12 +118,26 @@ class VideoTimelineBar extends StatelessWidget {
     Duration remaining,
     List<BufferRange> bufferRanges,
   ) {
+    final slider = _buildSlider(position, duration, bufferRanges);
+    if (sliderWrapper == null) {
+      return Row(
+        children: [
+          _buildTimestamp(position),
+          const SizedBox(width: 12),
+          Expanded(child: slider),
+          const SizedBox(width: 12),
+          _buildTimestamp(remaining),
+        ],
+      );
+    }
+
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         _buildTimestamp(position),
-        const SizedBox(width: 12),
-        Expanded(child: _buildSlider(position, duration, bufferRanges)),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
+        Expanded(child: sliderWrapper!(slider)),
+        const SizedBox(width: 10),
         _buildTimestamp(remaining),
       ],
     );

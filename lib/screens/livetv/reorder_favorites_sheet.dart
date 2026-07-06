@@ -302,12 +302,7 @@ class _ReorderFavoritesSheetState extends State<ReorderFavoritesSheet> {
             width: 40,
             height: 40,
             child: channel?.thumb != null && client != null
-                ? LiveTvChannelLogo(
-                    client: client,
-                    imagePath: channel!.thumb!,
-                    width: 40,
-                    height: 40,
-                  )
+                ? LiveTvChannelLogo(client: client, imagePath: channel!.thumb!, width: 40, height: 40)
                 : Center(child: AppIcon(Symbols.live_tv_rounded, fill: 1, color: colorScheme.onSurfaceVariant)),
           ),
         ],

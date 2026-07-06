@@ -37,7 +37,7 @@ extension _PlexVideoControlsPlaybackExtrasMethods on _PlexVideoControlsState {
     if (!mounted) return;
     _setControlsState(() {
       _chapters = extras.chapters;
-      _markers = extras.markers;
+      _rawMarkers = extras.markers;
       _chaptersLoaded = true;
       _markersLoaded = true;
     });

@@ -17,6 +17,9 @@ class VideoPIPManager {
   /// Callback to prepare video filter before entering PiP
   VoidCallback? onBeforeEnterPip;
 
+  /// Whether desktop PiP resize should lock to the video aspect ratio.
+  bool Function()? pipResizeLocksAspectRatio;
+
   /// Update player size for PiP aspect ratio calculation
   void updatePlayerSize(Size size) {
     _playerSize = size;
@@ -82,7 +85,12 @@ class VideoPIPManager {
     }
 
     final dims = await _getVideoDimensions();
-    return await PipService.enter(width: dims.$1, height: dims.$2);
+    final lockAspect = DesktopPipService.isSupported && (pipResizeLocksAspectRatio?.call() ?? false);
+    return await PipService.enter(
+      width: dims.$1,
+      height: dims.$2,
+      lockAspectRatio: lockAspect,
+    );
   }
 
   Future<void> updateAutoPipState({required bool isPlaying}) async {

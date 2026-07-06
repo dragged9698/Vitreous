@@ -200,85 +200,62 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
   /// skip the per-category value fetch.
   @override
   Future<LibraryFilterResult> fetchLibraryFiltersWithValues(String libraryId, {MediaKind? libraryKind}) async {
-    final filters = <MediaFilter>[
-      MediaFilter(
-        filter: 'unwatched',
-        filterType: 'boolean',
-        key: 'jellyfin:unwatched',
-        title: t.libraries.filterCategories.unwatched,
-        type: 'filter',
-      ),
-    ];
     final data = await _safeFetchFilterPayload(libraryId, libraryKind: libraryKind);
-    if (data == null) return LibraryFilterResult(filters: filters, cachedValues: const {});
-    List<String> stringList(Object? raw) {
-      if (raw is! List) return const [];
-      return raw.whereType<String>().where((s) => s.isNotEmpty).toList();
-    }
-
-    final raw = <String, List<String>>{
-      'genre': stringList(data['Genres'] ?? data['genres']),
-      'contentRating': stringList(data['OfficialRatings'] ?? data['officialRatings']),
-      'tag': stringList(data['Tags'] ?? data['tags']),
-      'year': (data['Years'] ?? data['years'] is List)
-          ? ((data['Years'] ?? data['years']) as List).whereType<num>().map((y) => y.toInt().toString()).toList()
-          : const <String>[],
-    };
-
-    const order = ['genre', 'year', 'contentRating', 'tag'];
-    final titles = {
-      'genre': t.libraries.filterCategories.genre,
-      'year': t.libraries.filterCategories.year,
-      'contentRating': t.libraries.filterCategories.contentRating,
-      'tag': t.libraries.filterCategories.tag,
-    };
-    final values = <String, List<MediaFilterValue>>{};
-    for (final key in order) {
-      final entries = raw[key];
-      if (entries == null || entries.isEmpty) continue;
-      filters.add(
-        MediaFilter(filter: key, filterType: 'string', key: 'jellyfin:$key', title: titles[key] ?? key, type: 'filter'),
-      );
-      final sorted = List<String>.from(entries);
-      if (key == 'year') {
-        sorted.sort((a, b) => (int.tryParse(b) ?? 0).compareTo(int.tryParse(a) ?? 0));
-      } else {
-        sorted.sort();
-      }
-      values[key] = sorted.map((v) => MediaFilterValue(key: v, title: v)).toList();
-    }
-    return LibraryFilterResult(filters: filters, cachedValues: values);
+    return buildItemsApiFilterResult(data: data, keyPrefix: 'jellyfin');
   }
 
   Future<Map<String, dynamic>?> _safeFetchFilterPayload(String libraryId, {MediaKind? libraryKind}) async {
+    final includeItemTypes = JellyfinLibraryQueryTranslator.includeItemTypesFor(libraryKind);
+    final legacyParams = {
+      'userId': connection.userId,
+      'ParentId': libraryId,
+      'IncludeItemTypes': includeItemTypes,
+    };
+    final filters2Params = {
+      'userId': connection.userId,
+      'parentId': libraryId,
+      'includeItemTypes': includeItemTypes,
+      'recursive': 'true',
+    };
+
+    final legacy = await _tryFetchFilterEndpoint('/Items/Filters', legacyParams);
+    final legacyGenres = parseItemsFilterStringList(legacy?['Genres'] ?? legacy?['genres']);
+    if (legacyGenres.isNotEmpty) return legacy;
+
+    final filters2 = await _tryFetchFilterEndpoint('/Items/Filters2', filters2Params);
+    if (legacy != null && filters2 != null) {
+      final merged = Map<String, dynamic>.from(legacy);
+      final filters2Genres = parseItemsFilterStringList(filters2['Genres'] ?? filters2['genres']);
+      if (filters2Genres.isNotEmpty) merged['Genres'] = filters2Genres;
+      final filters2Tags = parseItemsFilterStringList(filters2['Tags'] ?? filters2['tags']);
+      if (filters2Tags.isNotEmpty && parseItemsFilterStringList(merged['Tags'] ?? merged['tags']).isEmpty) {
+        merged['Tags'] = filters2Tags;
+      }
+      return merged;
+    }
+    return filters2 ?? legacy;
+  }
+
+  Future<Map<String, dynamic>?> _tryFetchFilterEndpoint(String path, Map<String, String> queryParameters) async {
     try {
-      final response = await _http.get(
-        '/Items/Filters',
-        queryParameters: {
-          'userId': connection.userId,
-          'ParentId': libraryId,
-          'Recursive': 'true',
-          'IncludeItemTypes': JellyfinLibraryQueryTranslator.includeItemTypesFor(libraryKind),
-        },
-        timeout: _filtersTimeout,
-      );
+      final response = await _http.get(path, queryParameters: queryParameters, timeout: _filtersTimeout);
       throwIfHttpError(response);
       final data = response.data;
       return data is Map<String, dynamic> ? data : null;
     } on MediaServerHttpException catch (e, st) {
       if (e.statusCode == 404) {
-        appLogger.d('JellyfinClient: /Items/Filters not available on this server (filters disabled)');
+        appLogger.d('JellyfinClient: $path not available on this server (filters disabled)');
         return null;
       }
       if (!e.isTransient) rethrow;
-      appLogger.w('JellyfinClient: /Items/Filters timed out (filters disabled)', error: e, stackTrace: st);
+      appLogger.w('JellyfinClient: $path timed out (filters disabled)', error: e, stackTrace: st);
       return null;
     }
   }
 
   /// Jellyfin has no `/sorts` listing endpoint, so this returns a hardcoded
   /// list based on the broad sort set Streamyfin exposes. Keys remain
-  /// backend-neutral where Plezy already had saved preferences (`rating`,
+  /// backend-neutral where Vitreous already had saved preferences (`rating`,
   /// `lastViewedAt`, …); [JellyfinLibraryQueryTranslator] maps them to
   /// Jellyfin's `SortBy`/`SortOrder` at request time.
   @override
@@ -1427,7 +1404,7 @@ mixin _JellyfinBrowseMethods on MediaServerCacheMixin {
   }
 
   /// Jellyfin exposes local trailers separately from special features. Combine
-  /// both into Plezy's existing extras row, but keep remote/YouTube trailers
+  /// both into Vitreous's existing extras row, but keep remote/YouTube trailers
   /// out of scope because they are external URLs, not playable Jellyfin items.
   @override
   Future<List<MediaItem>> fetchExtras(String id) async {

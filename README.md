@@ -1,6 +1,6 @@
-# Emby Player
+# Vitreous
 
-Linux-focused Emby client forked from [Plezy](https://github.com/edde746/plezy).
+High-performance Emby media client for Linux, Android, iOS, macOS, Windows, and tvOS. Fork of [Plezy](https://github.com/edde746/plezy). Repo: [dragged9698/Vitreous](https://github.com/dragged9698/Vitreous).
 
 ## Setup
 
@@ -28,6 +28,6 @@ EMBY_SERVER_URL=... EMBY_USERNAME=... EMBY_PASSWORD=... dart test test/integrati
 ## Architecture
 
 - `packages/emby_core/` — standalone Emby REST client (auth, DTOs, repositories)
-- `lib/services/emby_client.dart` — Plezy `MediaServerClient` implementation
+- `lib/services/emby_client.dart` — Vitreous `MediaServerClient` implementation
 - `lib/domain/media_data_source.dart` — UI-facing repository abstraction
 - `lib/data/emby_media_data_source.dart` — adapter over `EmbyClient`

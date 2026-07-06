@@ -200,85 +200,145 @@ mixin _EmbyBrowseMethods on MediaServerCacheMixin {
   /// skip the per-category value fetch.
   @override
   Future<LibraryFilterResult> fetchLibraryFiltersWithValues(String libraryId, {MediaKind? libraryKind}) async {
-    final filters = <MediaFilter>[
-      MediaFilter(
-        filter: 'unwatched',
-        filterType: 'boolean',
-        key: 'emby:unwatched',
-        title: t.libraries.filterCategories.unwatched,
-        type: 'filter',
-      ),
-    ];
     final data = await _safeFetchFilterPayload(libraryId, libraryKind: libraryKind);
-    if (data == null) return LibraryFilterResult(filters: filters, cachedValues: const {});
-    List<String> stringList(Object? raw) {
-      if (raw is! List) return const [];
-      return raw.whereType<String>().where((s) => s.isNotEmpty).toList();
-    }
-
-    final raw = <String, List<String>>{
-      'genre': stringList(data['Genres'] ?? data['genres']),
-      'contentRating': stringList(data['OfficialRatings'] ?? data['officialRatings']),
-      'tag': stringList(data['Tags'] ?? data['tags']),
-      'year': (data['Years'] ?? data['years'] is List)
-          ? ((data['Years'] ?? data['years']) as List).whereType<num>().map((y) => y.toInt().toString()).toList()
-          : const <String>[],
-    };
-
-    const order = ['genre', 'year', 'contentRating', 'tag'];
-    final titles = {
-      'genre': t.libraries.filterCategories.genre,
-      'year': t.libraries.filterCategories.year,
-      'contentRating': t.libraries.filterCategories.contentRating,
-      'tag': t.libraries.filterCategories.tag,
-    };
-    final values = <String, List<MediaFilterValue>>{};
-    for (final key in order) {
-      final entries = raw[key];
-      if (entries == null || entries.isEmpty) continue;
-      filters.add(
-        MediaFilter(filter: key, filterType: 'string', key: 'emby:$key', title: titles[key] ?? key, type: 'filter'),
-      );
-      final sorted = List<String>.from(entries);
-      if (key == 'year') {
-        sorted.sort((a, b) => (int.tryParse(b) ?? 0).compareTo(int.tryParse(a) ?? 0));
-      } else {
-        sorted.sort();
-      }
-      values[key] = sorted.map((v) => MediaFilterValue(key: v, title: v)).toList();
-    }
-    return LibraryFilterResult(filters: filters, cachedValues: values);
+    return buildItemsApiFilterResult(data: data, keyPrefix: 'emby');
   }
 
-  Future<Map<String, dynamic>?> _safeFetchFilterPayload(String libraryId, {MediaKind? libraryKind}) async {
-    try {
-      final response = await _http.get(
-        '/Items/Filters',
-        queryParameters: {
-          'userId': connection.userId,
-          'ParentId': libraryId,
-          'Recursive': 'true',
-          'IncludeItemTypes': JellyfinLibraryQueryTranslator.includeItemTypesFor(libraryKind),
-        },
-        timeout: _filtersTimeout,
+  String? _embyMediaTypesFor(MediaKind? kind) {
+    return switch (kind) {
+      MediaKind.movie || MediaKind.show || MediaKind.mixed || MediaKind.unknown || MediaKind.clip => 'Video',
+      MediaKind.artist || MediaKind.album || MediaKind.track => 'Audio',
+      _ => null,
+    };
+  }
+
+  Map<String, String> _embyFiltersListingParams(String libraryId, {required MediaKind? libraryKind}) {
+    final includeItemTypes = JellyfinLibraryQueryTranslator.includeItemTypesFor(libraryKind);
+    final params = <String, String>{
+      'userId': connection.userId,
+      'ParentId': libraryId,
+      'IncludeItemTypes': includeItemTypes,
+    };
+    final mediaTypes = _embyMediaTypesFor(libraryKind);
+    if (mediaTypes != null) params['MediaTypes'] = mediaTypes;
+    return params;
+  }
+
+  Map<String, String> _embyNamedItemQueryParams(String libraryId, {required MediaKind? libraryKind}) {
+    return <String, String>{
+      'userId': connection.userId,
+      'ParentId': libraryId,
+      'Recursive': 'true',
+      'IncludeItemTypes': JellyfinLibraryQueryTranslator.includeItemTypesFor(libraryKind),
+      'SortBy': 'SortName',
+      'SortOrder': 'Ascending',
+      'Fields': 'SortName',
+    };
+  }
+
+  Future<Map<String, dynamic>> _safeFetchFilterPayload(String libraryId, {MediaKind? libraryKind}) async {
+    final listingParams = _embyFiltersListingParams(libraryId, libraryKind: libraryKind);
+    final payload = await _tryFetchFilterEndpoint('/Items/Filters', listingParams) ?? <String, dynamic>{};
+
+    // `/Items/Filters` Genres can be empty or wrong on Emby; `/Genres` with
+    // `MediaTypes` accidentally returns Series/Movie rows. Always rebuild genres
+    // from the items-by-name endpoint with a Type guard.
+    final genres = await _fetchEmbyGenreNames(libraryId, libraryKind: libraryKind);
+    if (genres.isNotEmpty) {
+      payload['Genres'] = genres;
+    } else {
+      payload.remove('Genres');
+      payload.remove('genres');
+    }
+
+    // Tags are plain strings on `/Items/Filters` only — never call `/Tags`.
+    await _enrichEmbyDedicatedFilterEndpoints(payload, libraryId, libraryKind: libraryKind);
+    return payload;
+  }
+
+  Future<void> _enrichEmbyDedicatedFilterEndpoints(
+    Map<String, dynamic> payload,
+    String libraryId, {
+    required MediaKind? libraryKind,
+  }) async {
+    if (parseItemsFilterYears(payload['Years'] ?? payload['years']).isEmpty) {
+      final yearParams = Map<String, String>.from(_embyNamedItemQueryParams(libraryId, libraryKind: libraryKind))
+        ..['SortBy'] = 'ProductionYear';
+      final years = await _fetchEmbyItemsByNameList('/Years', yearParams, allowedTypes: const {'Year'});
+      final parsedYears = years.map(int.tryParse).whereType<int>().where((year) => year > 0).toList();
+      if (parsedYears.isNotEmpty) payload['Years'] = parsedYears;
+    }
+    if (parseItemsFilterStringList(payload['OfficialRatings'] ?? payload['officialRatings']).isEmpty) {
+      final ratings = await _fetchEmbyItemsByNameList(
+        '/OfficialRatings',
+        _embyNamedItemQueryParams(libraryId, libraryKind: libraryKind),
       );
+      if (ratings.isNotEmpty) payload['OfficialRatings'] = ratings;
+    }
+  }
+
+  Future<List<String>> _fetchEmbyGenreNames(String libraryId, {required MediaKind? libraryKind}) {
+    return _fetchEmbyItemsByNameList(
+      '/Genres',
+      _embyNamedItemQueryParams(libraryId, libraryKind: libraryKind),
+      allowedTypes: const {'Genre', 'MusicGenre'},
+    );
+  }
+
+  Future<List<String>> _fetchEmbyItemsByNameList(
+    String path,
+    Map<String, String> queryParameters, {
+    Set<String>? allowedTypes,
+  }) async {
+    try {
+      final response = await _http.get(path, queryParameters: queryParameters, timeout: _filtersTimeout);
+      throwIfHttpError(response);
+      final data = response.data;
+      if (data is! Map<String, dynamic>) return const [];
+      final items = data['Items'];
+      if (items is! List) return const [];
+      final names = <String>[];
+      for (final item in items) {
+        if (item is String && item.isNotEmpty) {
+          names.add(item);
+          continue;
+        }
+        if (item is Map) {
+          final type = item['Type'] as String?;
+          if (allowedTypes != null && type != null && !allowedTypes.contains(type)) continue;
+          final name = item['Name'] ?? item['name'];
+          if (name is String && name.isNotEmpty) names.add(name);
+        }
+      }
+      return names;
+    } on MediaServerHttpException catch (e, st) {
+      if (e.statusCode == 404) return const [];
+      if (!e.isTransient) rethrow;
+      appLogger.w('EmbyClient: $path timed out while loading filters', error: e, stackTrace: st);
+      return const [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> _tryFetchFilterEndpoint(String path, Map<String, String> queryParameters) async {
+    try {
+      final response = await _http.get(path, queryParameters: queryParameters, timeout: _filtersTimeout);
       throwIfHttpError(response);
       final data = response.data;
       return data is Map<String, dynamic> ? data : null;
     } on MediaServerHttpException catch (e, st) {
       if (e.statusCode == 404) {
-        appLogger.d('EmbyClient: /Items/Filters not available on this server (filters disabled)');
+        appLogger.d('EmbyClient: $path not available on this server (filters disabled)');
         return null;
       }
       if (!e.isTransient) rethrow;
-      appLogger.w('EmbyClient: /Items/Filters timed out (filters disabled)', error: e, stackTrace: st);
+      appLogger.w('EmbyClient: $path timed out (filters disabled)', error: e, stackTrace: st);
       return null;
     }
   }
 
   /// Emby has no `/sorts` listing endpoint, so this returns a hardcoded
   /// list based on the broad sort set Streamyfin exposes. Keys remain
-  /// backend-neutral where Plezy already had saved preferences (`rating`,
+  /// backend-neutral where Vitreous already had saved preferences (`rating`,
   /// `lastViewedAt`, …); [JellyfinLibraryQueryTranslator] maps them to
   /// Emby's `SortBy`/`SortOrder` at request time.
   @override
@@ -1423,7 +1483,7 @@ mixin _EmbyBrowseMethods on MediaServerCacheMixin {
   }
 
   /// Emby exposes local trailers separately from special features. Combine
-  /// both into Plezy's existing extras row, but keep remote/YouTube trailers
+  /// both into Vitreous's existing extras row, but keep remote/YouTube trailers
   /// out of scope because they are external URLs, not playable Emby items.
   @override
   Future<List<MediaItem>> fetchExtras(String id) async {

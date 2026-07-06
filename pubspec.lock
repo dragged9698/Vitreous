@@ -406,6 +406,14 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  equatable:
+    dependency: transitive
+    description:
+      name: equatable
+      sha256: "3e0141505477fd8ad55d6eb4e7776d3fe8430be8e497ccb1521370c3f21a3e2b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.8"
   fake_async:
     dependency: "direct dev"
     description:
@@ -706,6 +714,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.1.0"
+  liquid_glass_widgets:
+    dependency: "direct main"
+    description:
+      name: liquid_glass_widgets
+      sha256: "1bb64164d5b47623c82ef0b9d412764329e054f25be8d21fb770750098f364ca"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.19.5"
   logger:
     dependency: "direct main"
     description:

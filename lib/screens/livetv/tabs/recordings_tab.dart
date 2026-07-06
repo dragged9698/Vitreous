@@ -17,7 +17,8 @@ import '../../../theme/mono_tokens.dart';
 import '../../../utils/app_logger.dart';
 import '../../../utils/dialogs.dart';
 import '../../../utils/formatters.dart';
-import '../../../widgets/app_icon.dart';
+import '../../../widgets/emby_glass_chrome.dart';
+import '../../../widgets/live_tv/emby_live_tv_chrome.dart';
 import '../../../widgets/overlay_sheet.dart';
 import '../livetv_recording_actions.dart';
 
@@ -213,17 +214,22 @@ class RecordingsTabState extends State<RecordingsTab> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_serverRecordings.isEmpty && _adminBlocked) {
-      return Center(child: _EmptyMessage(text: t.liveTv.dvrAdminRequired));
+      return EmbyGlassStateCard(icon: Symbols.admin_panel_settings_rounded, message: t.liveTv.dvrAdminRequired);
     }
     if (_serverRecordings.isEmpty && _error != null) {
-      return Center(child: _EmptyMessage(text: _error!));
+      return EmbyGlassStateCard(
+        icon: Symbols.error_rounded,
+        message: _error!,
+        actionLabel: t.common.retry,
+        onAction: _load,
+      );
     }
 
     final grabs = _allGrabs;
     final rules = _allRules;
 
     if (grabs.isEmpty && rules.isEmpty) {
-      return Center(child: _EmptyMessage(text: t.liveTv.noScheduledRecordings));
+      return EmbyGlassStateCard(icon: Symbols.fiber_manual_record_rounded, message: t.liveTv.noScheduledRecordings);
     }
 
     return OverlaySheetHost(
@@ -231,7 +237,7 @@ class RecordingsTabState extends State<RecordingsTab> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           if (grabs.isNotEmpty) ...[
-            _SectionHeader(t.liveTv.scheduledRecordings),
+            EmbyLiveTvSectionTitle(title: t.liveTv.scheduledRecordings, icon: Symbols.schedule_rounded),
             for (var i = 0; i < grabs.length; i++)
               _GrabTile(
                 entry: grabs[i],
@@ -243,7 +249,7 @@ class RecordingsTabState extends State<RecordingsTab> {
               ),
           ],
           if (rules.isNotEmpty) ...[
-            _SectionHeader(t.liveTv.recordingRules),
+            EmbyLiveTvSectionTitle(title: t.liveTv.recordingRules, icon: Symbols.rule_rounded),
             for (var i = 0; i < rules.length; i++)
               _RuleTile(
                 entry: rules[i],
@@ -255,45 +261,6 @@ class RecordingsTabState extends State<RecordingsTab> {
               ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyMessage extends StatelessWidget {
-  final String text;
-
-  const _EmptyMessage({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: .min,
-        children: [
-          AppIcon(Symbols.fiber_manual_record_rounded, size: 40, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(height: 12),
-          Text(text, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String label;
-
-  const _SectionHeader(this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
     );
   }

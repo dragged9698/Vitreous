@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../media/library_first_character.dart';
 import '../../../media/library_query.dart';
+import '../../../media/library_filter_result.dart';
 import '../../../media/media_backend.dart';
 import '../../../media/media_kind.dart';
 import '../../../media/media_item.dart';
@@ -334,7 +335,8 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
     }
   }
 
-  bool get _isJellyfinLibrary => widget.library.backend == MediaBackend.emby;
+  bool get _isJellyfinLibrary =>
+      widget.library.backend == MediaBackend.emby || widget.library.backend == MediaBackend.jellyfin;
   int get _activeFetchSize => _isJellyfinLibrary ? _jellyfinFetchSize : _fetchSize;
 
   bool get _supportsBrowseFilters {
@@ -930,19 +932,18 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
     _loadFirstCharacters();
   }
 
-  bool get _embyCategoricalFiltersMissing => _filters.every((f) => f.filterType == 'boolean');
-
   Future<void> _refreshEmbyFilters() async {
-    final client = context.getMediaClientForLibrary(widget.library);
-    final result = await client.fetchLibraryFiltersWithValues(
-      widget.library.id,
-      libraryKind: widget.library.browseKind,
-    );
+    final result = await _fetchFiltersCatalog();
     if (!mounted) return;
     setState(() {
       _filters = result.filters;
       _jellyfinFilterValues = result.cachedValues;
     });
+  }
+
+  Future<LibraryFilterResult> _fetchFiltersCatalog() async {
+    final client = context.getMediaClientForLibrary(widget.library);
+    return client.fetchLibraryFiltersWithValues(widget.library.id, libraryKind: widget.library.browseKind);
   }
 
   void _showFiltersBottomSheet() {
@@ -951,11 +952,13 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
   }
 
   Future<void> _openFiltersBottomSheet({VoidCallback? onBack}) async {
-    if (_isJellyfinLibrary && _embyCategoricalFiltersMissing) {
-      await _refreshEmbyFilters();
-    }
     if (!mounted) return;
-    OverlaySheetController.of(context).show(builder: (_) => _buildFiltersBottomSheet(onBack: onBack));
+    final controller = OverlaySheetController.of(context);
+    if (onBack != null) {
+      unawaited(controller.push(builder: (_) => _buildFiltersBottomSheet(onBack: onBack)));
+    } else {
+      unawaited(controller.show(builder: (_) => _buildFiltersBottomSheet(onBack: onBack)));
+    }
   }
 
   void _showFiltersOptionsPage(OverlaySheetController controller) {
@@ -971,6 +974,14 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
       libraryKey: widget.library.globalKey,
       loadFilterValues: _loadFilterValues,
       onBack: onBack,
+      resolveFilters: _isJellyfinLibrary ? _fetchFiltersCatalog : null,
+      onFiltersCatalogLoaded: (result) {
+        if (!mounted) return;
+        setState(() {
+          _filters = result.filters;
+          _jellyfinFilterValues = result.cachedValues;
+        });
+      },
       // Pre-populated values arrive only from backends that bundle them
       // with the category listing (Jellyfin's `/Items/Filters`). The empty
       // map for Plex libraries falls through to lazy `getFilterValues`.
@@ -1611,7 +1622,7 @@ class _LibraryBrowseTabState extends BaseLibraryTabState<MediaItem, LibraryBrows
         CachedNetworkImageProvider(
           imageUrl,
           cacheManager: PlexImageCacheManager.instance,
-          headers: const {'User-Agent': 'Plezy'},
+          headers: const {'User-Agent': 'Vitreous'},
           maxHeight: memHeight,
         ),
         context,
